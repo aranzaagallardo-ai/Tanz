@@ -1,0 +1,13 @@
+{
+  "name": "Tanz",
+  "short_name": "Tanz",
+  "description": "Tus documentos en audiolibro, sincronizados en todos tus dispositivos",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "es",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
