@@ -91,7 +91,7 @@ function synthChunk(texto, voz, rate) {
     let ok = false;
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
-    const timeout = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("timeout")); }, 30000);
+    const timeout = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("timeout")); }, 15000);
     ws.onopen = () => {
       const ts = new Date().toUTCString();
       ws.send(`X-Timestamp:${ts}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
@@ -142,6 +142,7 @@ function limpiar(t) {
   for (const [re, v] of UNIDADES) t = t.replace(re, v);
   t = t.replace(/(\d)-(\d)/g, "$1 a $2");
   t = t.replace(/[\u2010\u00ad]\s*/g, "");
+  t = t.replace(/(\d)[ \t]+(?=\d)/g, "$1");         // unir dígitos separados (solo misma línea)
   t = t.replace(/,\s*—\s*,?\s*/g, " — ");
   t = t.replace(/(?:,\s*){2,}/g, ", ");
   t = t.replace(/\s{2,}/g, " ");
@@ -183,24 +184,42 @@ async function pdfATexto(arrayBuffer, progreso) {
       for (let i = 1; i < frags.length; i++) gaps.push(Math.max(0, frags[i].x - (frags[i-1].x + frags[i-1].w)));
       const cortas = frags.filter((f) => f.s.trim().length <= 2).length;
       const espaciada = frags.length >= 6 && cortas >= frags.length * 0.5;
+      // umbral dinámico: medir cómo separa este PDF en particular
       let umbral = 2.2;
-      if (espaciada && gaps.length > 1) {
-        const chicos = gaps.filter((g) => g <= 15);   // ignorar saltos de columnas
-        const base = chicos.length >= 3 ? chicos : gaps;
+      const calcular = (piso) => {
+        const base = gaps.filter((g) => g <= 10);
+        if (base.length < 2) return piso;
         const media = base.reduce((a, b) => a + b, 0) / base.length;
         const sd = Math.sqrt(base.reduce((a, g) => a + (g - media) ** 2, 0) / base.length);
-        umbral = Math.max(0.4, media + 0.6 * sd);
+        return Math.max(piso, media + 0.6 * sd);
+      };
+      if (espaciada && gaps.length > 1) umbral = calcular(0.4);
+      else if (gaps.length >= 3) umbral = calcular(0.9);
+      const construir = (u, pegarLetras) => {
+        let l = "", fin = -1e9;
+        for (const f of frags) {
+          const gap = f.x - fin;
+          if (l === "") l = f.s;
+          else if (gap > 20) l += " — " + f.s;
+          else if (gap > u) l += " " + f.s;
+          else {
+            if (pegarLetras && f.s.length === 1 && gap <= u * 3 && /[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]$/.test(l) && /^[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]/.test(f.s)) l += f.s;
+            else l += " " + f.s;
+          }
+          fin = f.x + f.w;
+        }
+        return l.trim();
+      };
+      let linea = construir(umbral, true);
+      // si quedó deletreada (muchos tokens de 1 letra), separar solo en los huecos mayores
+      const tokens = linea.split(/\s+/).filter(Boolean);
+      const solos = tokens.filter((t) => t.length === 1).length;
+      if (tokens.length > 5 && solos / tokens.length > 0.5) {
+        const ordenados = [...gaps].sort((a, b) => a - b);
+        const p85 = ordenados[Math.floor(ordenados.length * 0.85)] || 3;
+        linea = construir(Math.max(p85, umbral * 1.6), true);
       }
-      let linea = "", fin = -1e9;
-      for (const f of frags) {
-        const gap = f.x - fin;
-        if (linea === "") linea = f.s;
-        else if (gap > 20) linea += " — " + f.s;
-        else if (gap > umbral) linea += " " + f.s;
-        else linea += f.s;
-        fin = f.x + f.w;
-      }
-      return linea.trim();
+      return linea;
     });
     paginas.push(orden);
     progreso(n, pdf.numPages);
