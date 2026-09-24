@@ -3,14 +3,84 @@
    Biblioteca: tu repo privado de GitHub, sincronizada entre dispositivos. */
 "use strict";
 
+/* ---------------- código de acceso (4 dígitos) ---------------- */
+const PIN_KEY = "tanz-pin-v1";
+let pinBuffer = "";
+let pinFase = null;
+let appIniciada = false;
+
+function pinRefrescar() {
+  const dots = document.querySelectorAll("#pin .dots span");
+  dots.forEach((d, i) => d.classList.toggle("lleno", i < pinBuffer.length));
+}
+function pinTecla(t) {
+  if (t === "borrar") { pinBuffer = pinBuffer.slice(0, -1); pinRefrescar(); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += t;
+  pinRefrescar();
+  if (pinBuffer.length === 4) pinResolver();
+}
+async function pinResolver() {
+  const err = document.querySelector("#pin .err");
+  const hash = btoa(unescape(encodeURIComponent("tanz." + pinBuffer + ".acceso")));
+  if (pinFase === "crear") {
+    localStorage.setItem("tanz-pin-borrador", hash);
+    pinFase = "confirmar"; pinBuffer = "";
+    document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
+    document.getElementById("pinTitulo").textContent = "Confírmalo";
+    err.textContent = "";
+    return;
+  }
+  if (pinFase === "confirmar") {
+    if (localStorage.getItem("tanz-pin-borrador") !== hash) {
+      pinBuffer = ""; pinRefrescar();
+      err.textContent = "No coincidió. Inténtalo de nuevo.";
+      return;
+    }
+    localStorage.setItem(PIN_KEY, hash);
+    localStorage.removeItem("tanz-pin-borrador");
+  } else if (pinFase === "entrar") {
+    if (localStorage.getItem(PIN_KEY) !== hash) {
+      err.textContent = "Código incorrecto.";
+      pinBuffer = ""; pinRefrescar();
+      return;
+    }
+  }
+  document.getElementById("pin").classList.add("oculto");
+  iniciarApp();
+}
+document.querySelectorAll("#pin .teclado button").forEach((b) => {
+  b.addEventListener("click", () => pinTecla(b.dataset.t));
+});
+function pinAbrir(fase, sub) {
+  pinFase = fase; pinBuffer = "";
+  const titulo = document.getElementById("pinTitulo");
+  if (titulo) titulo.textContent = fase === "entrar" ? "Tu código de acceso" : "Crea tu código de acceso";
+  const subEl = document.querySelector("#pin .sub");
+  if (subEl) subEl.textContent = sub;
+  document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
+  document.getElementById("pin").classList.remove("oculto");
+  pinRefrescar();
+}
+function pinIniciar() {
+  const guardado = localStorage.getItem(PIN_KEY);
+  if (guardado) pinAbrir("entrar", "Tu código de acceso");
+  else pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
+  document.getElementById("pin").classList.remove("oculto");
+}
+function iniciarApp() {
+  if (appIniciada) return;
+  appIniciada = true;
+  pintarBiblio().catch(() => {});
+}
+
 /* ---------------- configuración ---------------- */
 const CFG = {
   user: "aranzaagallardo-ai",
   repo: "tanz-biblioteca",
   token: ["github_pat_11CNPKXYA0", "x5BAEzDPKHkH_HcvOeWs4RQP8qe19J2IrcNoUSGdFK2NIKir8a1kJWW3ETJDWNRGWjyjb1TO"].join(""),
 };
-let vozNeuronal = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
-let vozSel = localStorage.getItem("tanz-voz") || "es";
+let vozSel = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
 let docTexto = "", docNombre = "";
 
 const $ = (id) => document.getElementById(id);
@@ -55,7 +125,7 @@ async function ghBorrar(path, sha) {
 }
 const ID_IDX = "index.json";
 
-/* ---------------- Git Data (guardar el MP3 en la biblioteca) ---------------- */
+/* ---------------- Git Data (MP3 completo en la biblioteca) ---------------- */
 async function ghBlob(b64) {
   const r = await gh("git/blobs", { method: "POST", body: JSON.stringify({ content: b64, encoding: "base64" }) });
   if (!r.ok) throw new Error("blob " + r.status);
@@ -227,7 +297,7 @@ async function cargar(file) {
   aviso("");
 }
 
-/* ---------------- trocear ---------------- */
+/* ---------------- síntesis por trozos (puente) ---------------- */
 function trocearParaTTS(texto, max = 550) {
   const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
   const trozos = [];
@@ -370,13 +440,7 @@ async function reproducirNube(d, boton) {
     const f = await ghLeer(`docs/${d.id}/texto.json`);
     if (!f) throw new Error("no encontrado");
     const texto = JSON.parse(await f.blob.text()).texto;
-    try {
-      await synthNeuronal(texto, vozSel, "+0%", aviso);
-      aviso("Listo.");
-    } catch (e2) {
-      aviso("Puente no disponible — usando voz alternativa…");
-      reproducirTexto(texto);
-    }
+    reproducirTexto(texto);
   } catch (e) { alert("No pude cargar: " + e.message); }
   boton.textContent = "Escuchar";
 }
@@ -390,29 +454,7 @@ async function borrarDoc(id) {
   }
 }
 
-/* ---------------- generar: dos motores ---------------- */
-$("btnGenerar").addEventListener("click", async () => {
-  if (!docTexto) return;
-  $("btnGenerar").disabled = true;
-  aviso("Guardando en tu biblioteca…");
-  try {
-    await guardarDoc(docTexto, docNombre);
-    pintarBiblio();
-    try {
-      await synthNeuronal(docTexto, vozSel, "+0%", aviso);
-      aviso("Guardado. Reproduciendo…");
-      reproducirTexto(docTexto);
-    } catch (e) {
-      aviso("Guardado. Puente no disponible — reproduciendo con voz alternativa…");
-      reproducirTexto(docTexto);
-    }
-  } catch (e) {
-    aviso("Error: " + e.message);
-  } finally {
-    $("btnGenerar").disabled = false;
-  }
-});
-
+/* ---------------- botón voz neuronal ---------------- */
 $("btnNeuronal").addEventListener("click", async () => {
   if (!docTexto || $("btnNeuronal").dataset.ocupado === "1") return;
   $("btnNeuronal").dataset.ocupado = "1";
@@ -455,86 +497,11 @@ $("btnNeuronal").addEventListener("click", async () => {
 });
 
 /* ---------------- inicio ---------------- */
-/* ---------------- código de acceso (4 dígitos) ---------------- */
-const PIN_KEY = "tanz-pin-v1";
-let pinBuffer = "";
-let pinFase = null;
-let appIniciada = false;
-
-function pinRefrescar() {
-  const dots = document.querySelectorAll("#pin .dots span");
-  dots.forEach((d, i) => d.classList.toggle("lleno", i < pinBuffer.length));
-}
-function pinTecla(t) {
-  if (t === "borrar") { pinBuffer = pinBuffer.slice(0, -1); pinRefrescar(); return; }
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += t;
-  pinRefrescar();
-  if (pinBuffer.length === 4) pinResolver();
-}
-async function pinResolver() {
-  const err = document.querySelector("#pin .err");
-  const hash = btoa(unescape(encodeURIComponent("tanz." + pinBuffer + ".acceso")));
-  if (pinFase === "crear") {
-    localStorage.setItem("tanz-pin-borrador", hash);
-    pinFase = "confirmar"; pinBuffer = "";
-    document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
-    err.textContent = "";
-    document.getElementById("pinTitulo").textContent = "Confírmalo";
-    return;
-  }
-  if (pinFase === "confirmar") {
-    if (localStorage.getItem("tanz-pin-borrador") !== hash) {
-      pinBuffer = ""; pinRefrescar();
-      err.textContent = "No coincidió. Inténtalo de nuevo.";
-      return;
-    }
-    localStorage.setItem(PIN_KEY, hash);
-    localStorage.removeItem("tanz-pin-borrador");
-  } else if (pinFase === "entrar") {
-    if (localStorage.getItem(PIN_KEY) !== hash) {
-      err.textContent = "Código incorrecto.";
-      pinBuffer = ""; pinRefrescar();
-      return;
-    }
-  }
-  document.getElementById("pin").classList.add("oculto");
-  iniciarApp();
-}
-document.querySelectorAll("#pin .teclado button").forEach((b) => {
-  b.addEventListener("click", () => pinTecla(b.dataset.t));
-});
-function pinAbrir(fase, sub) {
-  pinFase = fase; pinBuffer = "";
-  const titulo = document.getElementById("pinTitulo");
-  if (titulo) titulo.textContent = fase === "entrar" ? "Tu código de acceso" : "Crea tu código de acceso";
-  const subEl = document.querySelector("#pin .sub");
-  if (subEl) subEl.textContent = sub;
-  document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
-  document.getElementById("pin").classList.remove("oculto");
-  pinRefrescar();
-}
-function iniciarApp() {
-  if (appIniciada) return;
-  appIniciada = true;
-  }
-function pinIniciar() {
-  const guardado = localStorage.getItem(PIN_KEY);
-  if (guardado) {
-    pinAbrir("entrar", "");
-  } else {
-    pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
-  }
-  document.getElementById("pin").classList.remove("oculto");
-}
-
 const contVoces = $("voces");
 const VOCES = [
-  { id: "es-CL-CatalinaNeural", nombre: "Catalina · Chile" },
-  { id: "es-MX-DaliaNeural", nombre: "Dalia · México" },
-  { id: "es-ES-ElviraNeural", nombre: "Elvira · España" },
-  { id: "es-CL-LorenzoNeural", nombre: "Lorenzo · Chile" },
-  { id: "es-US-PalomaNeural", nombre: "Paloma · EE.UU." },
+  { id: "es", nombre: "Español neutro" },
+  { id: "es-MX", nombre: "Español México" },
+  { id: "es-ES", nombre: "Español España" },
 ];
 for (const v of VOCES) {
   const b = document.createElement("button");
@@ -547,4 +514,4 @@ for (const v of VOCES) {
   };
   contVoces.appendChild(b);
 }
-pinIniciar();
+pintarBiblio().catch(() => {});
