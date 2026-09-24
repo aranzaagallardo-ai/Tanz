@@ -401,6 +401,61 @@ $("btnNeuronal").addEventListener("click", async () => {
 });
 
 /* ---------------- inicio ---------------- */
+/* ---------------- código de acceso (4 dígitos) ---------------- */
+const PIN_KEY = "tanz-pin-v1";
+let pinBuffer = "";
+let pinFase = null;
+
+function pinRefrescar() {
+  const dots = document.querySelectorAll("#pin .dots span");
+  dots.forEach((d, i) => d.classList.toggle("lleno", i < pinBuffer.length));
+}
+function pinTecla(t) {
+  if (t === "borrar") { pinBuffer = pinBuffer.slice(0, -1); pinRefrescar(); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += t;
+  pinRefrescar();
+  if (pinBuffer.length === 4) pinResolver();
+}
+function pinResolver() {
+  const err = document.querySelector("#pin .err");
+  const hash = btoa(unescape(encodeURIComponent("tanz." + pinBuffer + ".acceso")));
+  if (pinFase === "crear") {
+    localStorage.setItem("tanz-pin-borrador", hash);
+    pinFase = "confirmar"; pinBuffer = "";
+    document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
+    $("pinTitulo").textContent = "Confírmalo";
+    err.textContent = "";
+    return;
+  }
+  if (pinFase === "confirmar") {
+    if (localStorage.getItem("tanz-pin-borrador") !== hash) {
+      pinBuffer = ""; pinRefrescar();
+      err.textContent = "No coincidió. Inténtalo de nuevo.";
+      return;
+    }
+    localStorage.setItem(PIN_KEY, hash);
+    localStorage.removeItem("tanz-pin-borrador");
+  } else if (pinFase === "entrar") {
+    if (localStorage.getItem(PIN_KEY) !== hash) {
+      err.textContent = "Código incorrecto.";
+      pinBuffer = ""; pinRefrescar();
+      return;
+    }
+  }
+  $("pin").classList.add("oculto");
+  iniciarApp();
+}
+document.querySelectorAll("#pin .teclado button").forEach((b) => {
+  b.addEventListener("click", () => pinTecla(b.dataset.t));
+});
+function pinIniciar() {
+  const guardado = localStorage.getItem(PIN_KEY);
+  if (guardado) pinAbrir("entrar", "Tu código de acceso");
+  else pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
+  $("pin").classList.remove("oculto");
+}
+
 const contVoces = $("voces");
 const VOCES = [
   { id: "es", nombre: "Español neutro" },
@@ -418,4 +473,11 @@ for (const v of VOCES) {
   };
   contVoces.appendChild(b);
 }
-pintarBiblio().catch(() => {});
+let appIniciada = false;
+function iniciarApp() {
+  if (appIniciada) return;
+  appIniciada = true;
+  pintarBiblio().catch(() => {});
+}
+if (!localStorage.getItem(PIN_KEY)) pinIniciar();
+else { document.getElementById("pin").classList.add("oculto"); iniciarApp(); }
