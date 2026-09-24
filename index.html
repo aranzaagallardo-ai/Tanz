@@ -3,195 +3,248 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tanz</title>
-<meta name="theme-color" content="#0b1220">
+<title>Tanz — tus apuntes, en audiolibro</title>
+<meta name="theme-color" content="#eef5f9">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0b1220; --panel:#101a2c; --panel2:#0d1626;
-  --linea:rgba(125,211,252,.14); --linea2:rgba(125,211,252,.28);
-  --cian:#22d3ee; --cian-fuerte:#0ea5e9; --claro:#e8f1f8; --gris:#8aa0b8;
+  --papel:#f4f8fa; --panel:#ffffff; --tinta:#13293d; --tinta2:#3d5568; --gris:#7a8fa0;
+  --celeste:#0c8dd6; --celeste-osc:#065a8c; --celeste-suave:#e3f1f8; --linea:#d9e6ee;
+  --mono:"IBM Plex Mono", ui-monospace, monospace; --serif:"Fraunces", Georgia, serif;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-body{margin:0; min-height:100vh; color:var(--claro);
-  font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;
-  font-size:16px; line-height:1.5; padding-bottom:46px;
-  background:radial-gradient(900px 480px at 80% -8%, rgba(14,165,233,.16), transparent 60%),
-             radial-gradient(700px 420px at -10% 30%, rgba(34,211,238,.07), transparent 60%),
-             var(--bg);
-  background-attachment:fixed}
-h1,h2,h3{font-family:Sora,Inter,sans-serif}
-header{position:sticky; top:0; z-index:5; padding:16px 18px 13px;
-  background:rgba(11,18,32,.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--linea)}
-.header-in{max-width:680px; margin:0 auto; display:flex; align-items:center; justify-content:space-between}
-.logo{display:flex; align-items:center; gap:12px}
-.logo img{width:42px; height:42px; border-radius:11px; box-shadow:0 4px 14px -4px rgba(34,211,238,.45)}
-.logo .nombre{font-family:Sora; font-weight:800; font-size:1.4rem; letter-spacing:.4px; line-height:1;
-  background:linear-gradient(90deg,#7dd3fc,#e0f2fe); -webkit-background-clip:text; background-clip:text; color:transparent}
-.logo .sub{font-size:.74rem; color:var(--gris); margin-top:3px}
-header button{background:transparent; color:var(--gris); border:1px solid var(--linea2);
-  border-radius:10px; padding:7px 13px; font-size:.75rem; cursor:pointer; font-family:Inter; font-weight:600;
-  transition:.15s}
-header button:hover{color:var(--cian); border-color:var(--cian)}
-main{max-width:680px; margin:0 auto; padding:18px 14px 0}
-.layout{display:block}
-@media (min-width: 920px){
-  main{max-width:1120px}
-  .layout{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start}
-  .layout .card{margin-bottom:18px}
-  body{font-size:16.5px}
-  .card{padding:20px}
-}
-.card{background:linear-gradient(180deg, rgba(125,211,252,.05), rgba(125,211,252,.015));
-  border:1px solid var(--linea); border-radius:20px; padding:17px; margin-bottom:16px}
-.card h2{margin:0 0 11px; font-size:.74rem; text-transform:uppercase; letter-spacing:1.6px;
-  color:#7dd3fc; display:flex; align-items:center; gap:9px; font-weight:700}
-.card h2 .n{background:rgba(34,211,238,.12); color:var(--cian); width:22px; height:22px; border-radius:8px;
-  display:inline-flex; align-items:center; justify-content:center; font-size:.72rem;
-  border:1px solid rgba(34,211,238,.3)}
-.drop{border:1.5px dashed rgba(125,211,252,.3); border-radius:16px; padding:26px 12px; text-align:center;
-  color:var(--gris); cursor:pointer; transition:.15s; background:rgba(13,22,38,.5)}
-.drop:hover{border-color:var(--cian)}
-.drop.on{border-color:var(--cian); background:rgba(34,211,238,.08)}
-.drop strong{color:#bae6fd; font-weight:600}
-.drop small{font-size:.76rem}
+body{margin:0; color:var(--tinta); background:var(--papel);
+  font-family:Inter,-apple-system,sans-serif; font-size:15.5px; line-height:1.55;
+  min-height:100vh}
+::selection{background:#bfe3f5}
+
+/* ---------- estructura ---------- */
+.escritorio{display:flex; min-height:100vh}
+.sidebar{width:248px; flex:none; padding:30px 26px; border-right:1px solid var(--linea);
+  position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:6px;
+  background:linear-gradient(180deg,#ffffff, #f2f8fb)}
+.marca{font-family:var(--serif); font-size:2.1rem; font-weight:700; letter-spacing:.5px;
+  color:var(--tinta); display:flex; align-items:baseline; gap:9px}
+.marca .punto{width:11px; height:11px; border-radius:50%; background:var(--celeste); flex:none}
+.sub{font-family:var(--mono); font-size:.68rem; color:var(--gris); letter-spacing:.6px; margin:2px 0 26px}
+.paso{display:flex; gap:13px; padding:13px 10px; border-radius:12px; align-items:flex-start; transition:.15s}
+.paso:hover{background:#edf5f9}
+.paso .num{font-family:var(--mono); font-size:.72rem; color:var(--celeste); border:1px solid var(--celeste);
+  border-radius:6px; padding:2px 6px; margin-top:2px}
+.paso .t{font-weight:600; font-size:.92rem}
+.paso .d{font-size:.76rem; color:var(--gris); margin-top:1px}
+.sidebar .pie{margin-top:auto; font-family:var(--mono); font-size:.64rem; color:#a8bac8; line-height:1.6}
+.contenido{flex:1; padding:26px 34px 50px; min-width:0}
+.hero{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px}
+.hero h1{font-family:var(--serif); font-weight:600; font-size:2.3rem; margin:0; letter-spacing:-.5px}
+.hero h1 em{font-style:italic; color:var(--celeste)}
+.hero .meta{font-family:var(--mono); font-size:.7rem; color:var(--gris); letter-spacing:1px}
+
+/* ---------- tarjetas ---------- */
+.card{background:var(--panel); border:1px solid var(--linea); border-radius:6px; padding:22px 24px;
+  margin-bottom:18px; position:relative}
+.card::before{content:""; position:absolute; top:-1px; left:18px; right:auto; width:46px; height:3px;
+  background:var(--celeste); border-radius:0 0 3px 3px}
+.card h2{margin:0 0 14px; font-size:.98rem; font-weight:600; color:var(--tinta); letter-spacing:.2px}
+.rotulo{font-family:var(--mono); font-size:.68rem; color:var(--gris); text-transform:uppercase;
+  letter-spacing:1.5px; margin:0 0 6px}
+
+/* ---------- dropzone ---------- */
+.drop{border:1.5px solid var(--linea); border-radius:4px; padding:30px 16px; text-align:center;
+  color:var(--gris); cursor:pointer; transition:.18s; position:relative; background:#fbfdfe}
+.drop:hover, .drop.on{border-color:var(--celeste); background:#f4fafd}
+.drop .icono{font-family:var(--mono); font-size:1.6rem; color:var(--celeste); display:block; margin-bottom:6px}
+.drop strong{color:var(--tinta); font-weight:600}
+.drop small{font-size:.78rem}
 #archivo{display:none}
-.nombre-doc{margin-top:10px; font-weight:600; color:#bae6fd; word-break:break-all;
-  display:flex; align-items:center; gap:7px; font-size:.92rem}
-.nombre-doc svg{flex:none}
-.preview{max-height:180px; overflow:auto; background:rgba(13,22,38,.7); border:1px solid var(--linea);
-  border-radius:12px; padding:10px 12px; font-size:.8rem; white-space:pre-wrap; color:#a9bccd; margin-top:10px}
+.nombre-doc{margin-top:10px; font-weight:600; color:var(--celeste-osc); word-break:break-all; font-size:.92rem}
+.preview{max-height:170px; overflow:auto; background:#f8fbfd; border:1px solid var(--linea);
+  border-radius:4px; padding:10px 12px; font-size:.79rem; white-space:pre-wrap; color:var(--tinta2); margin-top:10px;
+  font-family:var(--mono)}
 .stats{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
-.pill{background:rgba(34,211,238,.1); color:#7dd3fc; border:1px solid rgba(34,211,238,.25);
-  border-radius:999px; padding:3px 12px; font-size:.74rem; font-weight:600}
-.chips{display:flex; flex-wrap:wrap; gap:8px}
-.chip{border:1.5px solid var(--linea2); background:transparent; color:#c9d9e6; border-radius:999px;
-  padding:8px 14px; font-size:.86rem; cursor:pointer; transition:.12s; font-weight:500}
-.chip:hover{border-color:var(--cian); color:#e0f2fe}
-.chip.sel{background:linear-gradient(135deg,#0ea5e9,#22d3ee); border-color:transparent; color:#06202e; font-weight:700;
-  box-shadow:0 4px 14px -3px rgba(34,211,238,.6)}
-.fila{display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:13px}
-.fila label{font-size:.78rem; color:var(--gris); font-weight:600; text-transform:uppercase; letter-spacing:.6px}
-select{font-size:.9rem; padding:8px 11px; border-radius:11px; border:1.5px solid var(--linea2);
-  background:var(--panel2); color:var(--claro); font-family:Inter; outline:none}
-select:focus{border-color:var(--cian)}
-label.chk{display:flex; gap:7px; align-items:center; font-size:.85rem; color:#c9d9e6; margin-left:auto; font-weight:500}
-label.chk input{width:16px; height:16px; accent-color:var(--cian)}
-button.grande{width:100%; margin-top:14px; background:linear-gradient(135deg,#22d3ee,#0284c7); color:#06202e;
-  border:none; border-radius:15px; padding:15px; font-size:1.04rem; font-weight:800; cursor:pointer;
-  transition:.15s; font-family:Sora; letter-spacing:.3px;
-  box-shadow:0 8px 24px -6px rgba(34,211,238,.55)}
-button.grande:active{transform:scale(.99)}
-button.grande:disabled{opacity:.4; box-shadow:none}
-button.grande:hover:not(:disabled){box-shadow:0 10px 30px -6px rgba(34,211,238,.7)}
-.barra{height:8px; background:rgba(125,211,252,.12); border-radius:99px; overflow:hidden; margin-top:13px}
-.barra > div{height:100%; width:0%; background:linear-gradient(90deg,#22d3ee,#38bdf8); transition:width .3s;
-  box-shadow:0 0 12px rgba(34,211,238,.6)}
-.aviso{font-size:.8rem; color:var(--gris); margin-top:8px; min-height:1.2em}
-audio{width:100%; margin-top:10px; filter:invert(.92) hue-rotate(180deg) saturate(.7)}
+.pill{font-family:var(--mono); background:var(--celeste-suave); color:var(--celeste-osc);
+  border-radius:3px; padding:3px 9px; font-size:.72rem}
+
+/* ---------- voces ---------- */
+.chips{display:flex; flex-direction:column; gap:2px}
+.chip{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%;
+  border:none; background:transparent; color:var(--tinta2); border-radius:6px;
+  padding:9px 12px; font-size:.9rem; cursor:pointer; transition:.12s; text-align:left; font-family:Inter}
+.chip:hover{background:var(--celeste-suave)}
+.chip.sel{background:var(--celeste-suave); box-shadow:inset 3px 0 0 var(--celeste); color:var(--celeste-osc); font-weight:600}
+.chip .cod{font-family:var(--mono); font-size:.64rem; color:var(--gris)}
+.chip.sel .cod{color:var(--celeste)}
+.fila{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:13px; border-top:1px solid var(--linea)}
+.fila label{font-family:var(--mono); font-size:.68rem; color:var(--gris); text-transform:uppercase; letter-spacing:1px}
+select{font-size:.88rem; padding:7px 10px; border-radius:4px; border:1px solid var(--linea);
+  background:#fff; color:var(--tinta); font-family:Inter; outline:none}
+select:focus{border-color:var(--celeste)}
+label.chk{display:flex; gap:7px; align-items:center; font-size:.84rem; color:var(--tinta2); margin-left:auto}
+label.chk input{width:15px; height:15px; accent-color:var(--celeste)}
+
+/* ---------- generar ---------- */
+button.grande{width:100%; margin-top:0; background:var(--celeste-osc); color:#fff; border:none;
+  border-radius:5px; padding:15px; font-size:.98rem; font-weight:600; cursor:pointer; transition:.15s;
+  font-family:Inter; letter-spacing:.2px}
+button.grande:hover:not(:disabled){background:var(--celeste)}
+button.grande:disabled{opacity:.4; cursor:default}
+.barra{height:3px; background:var(--linea); border-radius:99px; overflow:hidden; margin-top:14px}
+.barra > div{height:100%; width:0%; background:var(--celeste); transition:width .3s}
+.aviso{font-family:var(--mono); font-size:.74rem; color:var(--tinta2); margin-top:9px; min-height:1.3em}
+audio{width:100%; margin-top:12px}
 .acciones{display:flex; gap:9px; flex-wrap:wrap; margin-top:12px}
-.acciones a,.acciones button{flex:1; min-width:130px; text-align:center; text-decoration:none;
-  border-radius:12px; padding:11px; font-size:.9rem; font-weight:700; cursor:pointer; font-family:Sora;
-  border:1.5px solid var(--linea2); background:transparent; color:#7dd3fc; transition:.15s}
-.acciones a:hover,.acciones button:hover{border-color:var(--cian)}
-.acciones a{background:linear-gradient(135deg,#22d3ee,#0284c7); border-color:transparent; color:#06202e}
-.doc-item{display:flex; align-items:center; gap:9px; padding:12px 4px; border-bottom:1px solid rgba(125,211,252,.09)}
+.acciones a{flex:1; min-width:140px; text-align:center; text-decoration:none; border-radius:5px;
+  padding:11px; font-size:.88rem; font-weight:600; background:var(--celeste-osc); color:#fff; transition:.15s}
+.acciones a:hover{background:var(--celeste)}
+.nota{font-size:.75rem; color:var(--gris); margin:8px 0 0}
+
+/* ---------- biblioteca ---------- */
+.doc-item{display:flex; align-items:center; gap:12px; padding:13px 2px; border-bottom:1px solid #edf3f7}
 .doc-item:last-child{border-bottom:none}
 .doc-item .info{flex:1; min-width:0}
-.doc-item .info b{display:block; font-size:.9rem; word-break:break-all; font-weight:600}
-.doc-item .info small{color:var(--gris); font-size:.72rem}
-.doc-item button{border:1.5px solid var(--linea2); background:transparent; color:#bae6fd;
-  border-radius:9px; padding:6px 10px; font-size:.78rem; cursor:pointer; font-weight:600; transition:.12s}
-.doc-item button:hover{border-color:var(--cian); color:var(--cian)}
-.doc-item button.del{color:#fda4af; border-color:rgba(253,164,175,.35)}
-.doc-item button.del:hover{border-color:#fda4af; background:rgba(253,164,175,.08)}
-.vacio{color:var(--gris); font-size:.86rem; text-align:center; padding:12px}
+.doc-item .info b{display:block; font-size:.9rem; font-weight:600; word-break:break-all}
+.doc-item .info small{font-family:var(--mono); color:var(--gris); font-size:.68rem}
+.doc-item button{border:1px solid var(--linea); background:#fff; color:var(--celeste-osc);
+  border-radius:4px; padding:6px 11px; font-size:.76rem; cursor:pointer; font-weight:600; transition:.12s; font-family:Inter}
+.doc-item button:hover{border-color:var(--celeste); background:var(--celeste-suave)}
+.doc-item button.del{color:#b54a4a; border-color:#eed7d7}
+.doc-item button.del:hover{background:#fdf4f4}
+.vacio{color:var(--gris); font-size:.86rem; text-align:center; padding:14px}
 .oculto{display:none}
-footer{text-align:center; color:#43607a; font-size:.72rem; margin-top:20px; padding:0 12px}
-/* config */
+
+/* ---------- config ---------- */
+#config{position:fixed; inset:0; z-index:50; background:rgba(19,41,61,.55); backdrop-filter:blur(6px);
+  display:flex; align-items:center; justify-content:center; padding:20px}
+#config .box{background:#fff; border-radius:8px; padding:30px 28px; max-width:400px; width:100%; text-align:center;
+  box-shadow:0 30px 70px -20px rgba(19,41,61,.5)}
+#config h1{font-family:var(--serif); font-size:1.9rem; margin:0 0 4px; color:var(--tinta)}
+#config p{color:var(--gris); font-size:.83rem; margin:0 0 18px}
+#config input{width:100%; padding:12px; border-radius:5px; border:1px solid var(--linea);
+  font-size:.92rem; text-align:center; margin-bottom:10px; outline:none; font-family:var(--mono); background:#fbfdfe}
+#config input:focus{border-color:var(--celeste)}
+#config button{width:100%; padding:12px; border-radius:5px; border:none; background:var(--celeste-osc);
+  color:#fff; font-size:.95rem; font-weight:600; cursor:pointer}
+#config .err{color:#b54a4a; font-size:.8rem; min-height:1.2em; margin-top:8px}
+
+footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var(--mono);
+  font-size:.66rem; color:#a8bac8; letter-spacing:.4px}
+
+/* ---------- móvil ---------- */
+@media (max-width: 919px){
+  .escritorio{display:block}
+  .sidebar{width:auto; height:auto; position:static; border-right:none; border-bottom:1px solid var(--linea);
+    padding:20px 18px 14px; background:#fff}
+  .sub{margin-bottom:8px}
+  .paso{display:none}
+  .sidebar .pie{display:none}
+  .contenido{padding:18px 16px 40px}
+  .hero h1{font-size:1.7rem}
+  footer{padding:0 16px 30px}
+}
+@media (max-width: 479px){
+  .hero h1{font-size:1.5rem}
+  .card{padding:17px 15px}
+}
 </style>
 </head>
 <body>
 
+<div id="config" class="oculto">
+  <div class="box">
+    <h1>Tanz</h1>
+    <p>Conecta tu GitHub para la biblioteca sincronizada</p>
+    <input id="cfgUser" placeholder="Usuario de GitHub" autocomplete="off">
+    <input id="cfgRepo" placeholder="Repositorio (tanz-biblioteca)" value="tanz-biblioteca" autocomplete="off">
+    <input id="cfgToken" type="password" placeholder="Token (PAT)" autocomplete="off">
+    <button id="btnCfgGuardar">Conectar</button>
+    <div class="err" id="cfgErr"></div>
+  </div>
+</div>
 
-<header>
-  <div class="header-in">
-    <div class="logo">
-      <img src="icon.svg" alt="">
-      <div>
-        <div class="nombre">Tanz</div>
-        <div class="sub">documentos → audiolibro, sincronizado</div>
+<div class="escritorio">
+  <aside class="sidebar">
+    <div class="marca">Tanz <span class="punto"></span></div>
+    <div class="sub">AUDIO · APUNTES · ESTUDIO</div>
+    <div class="paso"><span class="num">01</span><div><div class="t">Documento</div><div class="d">PDF, Markdown o texto</div></div></div>
+    <div class="paso"><span class="num">02</span><div><div class="t">Voz</div><div class="d">8 voces, 7 países</div></div></div>
+    <div class="paso"><span class="num">03</span><div><div class="t">Generar</div><div class="d">audio al instante</div></div></div>
+    <div class="paso"><span class="num">04</span><div><div class="t">Biblioteca</div><div class="d">sincronizada por GitHub</div></div></div>
+    <div class="pie">TANZ v2 · VOCES NEURONALES EDGE<br>SÍNTESIS EN TU DISPOSITIVO<br>BIBLIOTECA · GITHUB</div>
+  </aside>
+
+  <div class="contenido">
+    <div class="hero">
+      <h1>Tus apuntes, <em>en audiolibro</em></h1>
+      <div class="meta">TANZ · ESTUDIO EN VOZ ALTA</div>
+    </div>
+
+    <div class="card">
+      <h2>Documento</h2>
+      <div class="rotulo">01 · SUBIR ARCHIVO</div>
+      <div class="drop" id="drop">
+        <span class="icono">⇪</span>
+        Toca para elegir un archivo<br><strong>PDF, .md o .txt</strong><br><small>desde Archivos, iCloud o Descargas</small>
+      </div>
+      <input type="file" id="archivo" accept=".pdf,.md,.txt,.markdown,text/plain,application/pdf">
+      <div class="nombre-doc oculto" id="nombreDoc">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0c8dd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <span id="nombreSpan"></span>
+      </div>
+      <div class="preview oculto" id="preview"></div>
+      <div class="stats oculto" id="stats"></div>
+    </div>
+
+    <div class="card">
+      <h2>Voz y velocidad</h2>
+      <div class="rotulo">02 · ELEGIR VOZ</div>
+      <div class="chips" id="voces"></div>
+      <div class="fila">
+        <label>Lectura</label>
+        <select id="rate">
+          <option value="+0%">normal</option>
+          <option value="+10%">un poco rápido</option>
+          <option value="+20%">rápido</option>
+          <option value="-10%">lento</option>
+        </select>
+        <label>Escucha</label>
+        <select id="playback">
+          <option value="1">1×</option><option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="aNube" checked> subir a mi biblioteca</label>
       </div>
     </div>
+
+    <div class="card">
+      <h2>Generar audio</h2>
+      <div class="rotulo">03 · SINTETIZAR</div>
+      <button class="grande" id="btnGenerar" disabled>Generar audiolibro</button>
+      <div class="barra oculto" id="barraWrap"><div id="barra"></div></div>
+      <div class="aviso" id="aviso"></div>
+      <div id="resultado" class="oculto">
+        <div class="rotulo" style="margin-top:12px">04 · ESCUCHA AQUÍ MISMO</div>
+        <audio id="player" controls></audio>
+        <div class="acciones">
+          <a id="btnDescargar" download>Descargar MP3</a>
+        </div>
+        <p class="nota">El audio también queda en tu biblioteca: se sincroniza con tus otros dispositivos.</p>
+      </div>
     </div>
-</header>
-<main>
 
-<div class="layout">
-<div class="card">
-  <h2><span class="n">1</span> Documento</h2>
-  <div class="drop" id="drop">
-    Toca para elegir un archivo<br><strong>PDF, .md o .txt</strong><br><small>desde Archivos, iCloud o Descargas</small>
-  </div>
-  <input type="file" id="archivo" accept=".pdf,.md,.txt,.markdown,text/plain,application/pdf">
-  <div class="nombre-doc oculto" id="nombreDoc">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-    <span id="nombreSpan"></span>
-  </div>
-  <div class="preview oculto" id="preview"></div>
-  <div class="stats oculto" id="stats"></div>
-</div>
-
-<div class="card">
-  <h2><span class="n">2</span> Voz y velocidad</h2>
-  <div class="chips" id="voces"></div>
-  <div class="fila">
-    <label>Lectura</label>
-    <select id="rate">
-      <option value="+0%">normal</option>
-      <option value="+10%">un poco rápido</option>
-      <option value="+20%">rápido</option>
-      <option value="-10%">lento</option>
-    </select>
-    <label>Escucha</label>
-    <select id="playback">
-      <option value="1">1×</option><option value="1.25">1.25×</option>
-      <option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option>
-    </select>
-    <label class="chk"><input type="checkbox" id="aNube" checked> subir a mi biblioteca</label>
-  </div>
-</div>
-
-<div class="card">
-  <h2><span class="n">3</span> Generar audio</h2>
-  <button class="grande" id="btnGenerar" disabled>Generar audiolibro</button>
-  <div class="barra oculto" id="barraWrap"><div id="barra"></div></div>
-  <div class="aviso" id="aviso"></div>
-  <div id="resultado" class="oculto">
-    <audio id="player" controls></audio>
-    <div class="acciones">
-      <a id="btnDescargar" download>Descargar MP3</a>
+    <div class="card">
+      <h2>Biblioteca</h2>
+      <div class="rotulo">04 · SINCRONIZADA POR GITHUB</div>
+      <div id="biblioteca"><div class="vacio">Cargando…</div></div>
     </div>
-    <p style="font-size:.75rem;color:var(--gris);margin:6px 0 0">
-      Lo que subes a tu biblioteca aparece en todos tus dispositivos con la misma cuenta de GitHub.
-    </p>
   </div>
 </div>
 
-<div class="card">
-  <h2><span class="n">4</span> Tu biblioteca (sincronizada por GitHub)</h2>
-  <div id="biblioteca"><div class="vacio">Cargando…</div></div>
-</div>
-</div>
-
-<footer>Tanz · voces neuronales de Microsoft Edge, sintetizadas en tu propio dispositivo · PDF, Markdown y texto</footer>
-</main>
+<footer>TANZ · VOCES NEURONALES EDGE · SÍNTESIS EN TU PROPIO DISPOSITIVO · PDF / MD / TXT</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="app.js"></script>
