@@ -1,44 +1,30 @@
-/* Tanz — tus apuntes en audiolibro.
-   Audio: voces de Google generadas al momento (sin servidores, sin cuelgues).
-   Biblioteca: tu repositorio privado de GitHub (sincronizada entre dispositivos). */
+/* Tanz — tus apuntes, en audiolibro completo.
+   Voz: neuronales Edge a través del puente (Render).
+   Biblioteca: tu repo privado de GitHub. */
 "use strict";
 
-/* ---------------- estado ---------------- */
+/* ---------------- configuración ---------------- */
 const CFG = {
   user: "aranzaagallardo-ai",
   repo: "tanz-biblioteca",
   token: ["github_pat_11CNPKXYA0", "x5BAEzDPKHkH_HcvOeWs4RQP8qe19J2IrcNoUSGdFK2NIKir8a1kJWW3ETJDWNRGWjyjb1TO"].join(""),
 };
-let vozSel = localStorage.getItem("tanz-voz") || "es";
+const PUENTE = localStorage.getItem("tanz-puente") || "https://tanz-puente.onrender.com";
+let vozSel = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
 let docTexto = "", docNombre = "";
 
 const $ = (id) => document.getElementById(id);
 const aviso = (m) => { $("aviso").textContent = m || ""; };
 
-/* ---------------- GitHub Contents API ---------------- */
+/* ---------------- GitHub API ---------------- */
 function gh(path, opts = {}) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 20000);
-  return fetch(`https://api.github.com/repos/${CFG.user}/${CFG.repo}/contents/${path}`, {
+  const t = setTimeout(() => ctrl.abort(), 25000);
+  return fetch(`https://api.github.com/repos/${CFG.user}/${CFG.repo}/${path}`, {
     ...opts,
     headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github+json", ...(opts.headers || {}) },
     signal: ctrl.signal,
   }).finally(() => clearTimeout(t));
-}
-function base64DesdeBlob(blob) {
-  return new Promise((res) => {
-    const fr = new FileReader();
-    fr.onload = () => res(fr.result.split(",")[1]);
-    fr.readAsDataURL(blob);
-  });
-}
-async function ghLeer(path) {
-  const r = await gh(path);
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error("GitHub " + r.status);
-  const j = await r.json();
-  const raw = await fetch(j.url, { headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github.raw" } });
-  return { sha: j.sha, blob: await raw.blob() };
 }
 async function ghLeerJSON(path) {
   const r = await gh(path);
@@ -48,13 +34,12 @@ async function ghLeerJSON(path) {
   const raw = await fetch(j.url, { headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github.raw" } });
   return { sha: j.sha, data: await raw.json() };
 }
-async function ghEscribir(path, blob, mensaje, sha) {
-  const content = await base64DesdeBlob(blob);
+async function ghEscribirJSON(path, data, mensaje, sha) {
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 1))));
   const body = { message: mensaje, content };
   if (sha) body.sha = sha;
   const r = await gh(path, { method: "PUT", body: JSON.stringify(body) });
-  if (!r.ok) throw new Error("GitHub " + r.status + " al escribir " + path);
-  return r.json();
+  if (!r.ok) throw new Error("GitHub " + r.status);
 }
 async function ghBorrar(path, sha) {
   const r = await gh(path, { method: "DELETE", body: JSON.stringify({ message: "borrar " + path, sha }) });
@@ -203,53 +188,28 @@ async function cargar(file) {
   aviso("");
 }
 
-/* ---------------- audio: voces Google por trozos ---------------- */
-function trocearParaTTS(texto, max = 180) {
+/* ---------------- síntesis por trozos (puente) ---------------- */
+function trocearParaTTS(texto, max = 550) {
   const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
   const trozos = [];
   let actual = "";
   for (const o of partes) {
-    let frag = o;
-    while (frag.length > max) {
-      let corte = frag.lastIndexOf(" ", max);
-      if (corte < max * 0.4) corte = max;
-      trozos.push((actual ? actual + " " : "") + frag.slice(0, corte).trim());
-      actual = "";
-      frag = frag.slice(corte).trim();
-    }
-    actual = (actual ? actual + " " : "") + frag;
-    if (actual.length >= max) { trozos.push(actual.trim()); actual = ""; }
+    if ((actual + " " + o).length > max && actual) { trozos.push(actual.trim()); actual = o; }
+    else actual = (actual ? actual + " " : "") + o;
   }
   if (actual.trim()) trozos.push(actual.trim());
-  return trozos.filter((t) => t.length > 1);
-}
-function urlTTS(t, i, total) {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(t)}&tl=${vozSel}&total=${total}&idx=${i}&textlen=${t.length}`;
-}
-function reproducirSecuencia(urls, rate) {
-  const audio = $("player");
-  let i = 0;
-  audio.src = urls[0];
-  audio.playbackRate = rate;
-  audio.onended = () => {
-    i += 1;
-    if (i < urls.length) { audio.src = urls[i]; audio.playbackRate = rate; audio.play(); }
-  };
-  $("resultado").classList.remove("oculto");
-  audio.play();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  return trozos;
 }
 
 /* ---------------- biblioteca ---------------- */
-async function subirANube(texto, nombre) {
+async function guardarDoc(texto, nombre) {
   const slug = nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "doc";
   const id = slug + "-" + Date.now().toString(36);
-  const jsonDoc = JSON.stringify({ id, nombre, fecha: new Date().toISOString(), chars: texto.length, texto });
-  await ghEscribir(`docs/${id}/texto.json`, new Blob([jsonDoc], { type: "application/json" }), `agregar ${id}`);
+  await ghEscribirJSON(`docs/${id}/texto.json`, { id, nombre, fecha: new Date().toISOString(), chars: texto.length, texto }, `agregar ${id}`);
   const idxFile = await ghLeerJSON(ID_IDX);
   const idx = (idxFile && idxFile.data) || [];
   idx.unshift({ id, nombre, fecha: new Date().toISOString(), chars: texto.length });
-  await ghEscribir(ID_IDX, new Blob([JSON.stringify(idx, null, 1)], { type: "application/json" }), "índice", idxFile ? idxFile.sha : undefined);
+  await ghEscribirJSON(ID_IDX, idx, "índice", idxFile ? idxFile.sha : undefined);
   return id;
 }
 async function pintarBiblio() {
@@ -277,7 +237,7 @@ async function pintarBiblio() {
         const idxFile2 = await ghLeerJSON(ID_IDX);
         if (idxFile2) {
           const idx = idxFile2.data.filter((x) => x.id !== d.id);
-          await ghEscribir(ID_IDX, new Blob([JSON.stringify(idx, null, 1)], { type: "application/json" }), "índice", idxFile2.sha);
+          await ghEscribirJSON(ID_IDX, idx, "índice", idxFile2.sha);
         }
         pintarBiblio();
       };
@@ -292,43 +252,63 @@ async function reproducirNube(d, boton) {
   boton.textContent = "Cargando…";
   try {
     const f = await ghLeer(`docs/${d.id}/texto.json`);
-    if (!f) throw new Error("texto no encontrado");
+    if (!f) throw new Error("no encontrado");
     const texto = JSON.parse(await f.blob.text()).texto;
-    const trozos = trocearParaTTS(texto, 180);
-    const urls = trozos.map((t, i) => urlTTS(t, i, trozos.length));
-    reproducirSecuencia(urls, parseFloat($("playback").value));
-  } catch (e) { alert("No pude cargar el audio: " + e.message); }
+    reproducirTexto(texto);
+  } catch (e) { alert("No pude cargar: " + e.message); }
   boton.textContent = "Escuchar";
 }
-
-/* ---------------- generar ---------------- */
-$("btnGenerar").addEventListener("click", async () => {
-  if (!docTexto || $("btnGenerar").dataset.ocupado === "1") return;
-  $("btnGenerar").dataset.ocupado = "1";
-  $("btnGenerar").disabled = true;
-  $("barraWrap").classList.remove("oculto");
-  $("barra").style.width = "35%";
-  try {
-    aviso("Guardando en tu biblioteca…");
-    await subirANube(docTexto, docNombre);
-    $("barra").style.width = "100%";
-    aviso("Listo. Reproduciendo — también quedó en tu biblioteca.");
-    const trozos = trocearParaTTS(docTexto, 180);
-    const urls = trozos.map((t, i) => urlTTS(t, i, trozos.length));
-    try { reproducirSecuencia(urls, parseFloat($("playback").value)); } catch (p) { console.warn(p); }
-    pintarBiblio();
-  } catch (e) {
-    aviso("Error: " + e.message + " — vuelve a intentarlo.");
-  } finally {
-    $("barraWrap").classList.add("oculto");
-    delete $("btnGenerar").dataset.ocupado;
-    $("btnGenerar").disabled = false;
-    $("btnGenerar").textContent = "Generar audiolibro";
+async function borrarDoc(id) {
+  const f = await ghLeer(`docs/${id}/texto.json`);
+  if (f) await ghBorrar(`docs/${id}/texto.json`, f.sha);
+  const idxFile = await ghLeerJSON(ID_IDX);
+  if (idxFile) {
+    const idx = idxFile.data.filter((x) => x.id !== id);
+    await ghEscribirJSON(ID_IDX, idx, "índice", idxFile.sha);
   }
-});
-// autoplay bloqueado nunca debe romper el flujo
-$("player").addEventListener("error", () => { console.warn("audio error"); });
-$("playback").addEventListener("change", () => { $("player").playbackRate = parseFloat($("playback").value); });
+}
+
+/* ---------------- reproducir texto (Google, secuencial, sin servidor) ---------------- */
+function trocearGoogle(texto, max = 180) {
+  const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
+  const trozos = [];
+  let actual = "";
+  for (const o of partes) {
+    let frag = o;
+    while (frag.length > max) {
+      let corte = frag.lastIndexOf(" ", max);
+      if (corte < max * 0.4) corte = max;
+      trozos.push((actual ? actual + " " : "") + frag.slice(0, corte).trim());
+      actual = "";
+      frag = frag.slice(corte).trim();
+    }
+    actual = (actual ? actual + " " : "") + frag;
+    if (actual.length >= max) { trozos.push(actual.trim()); actual = ""; }
+  }
+  if (actual.trim()) trozos.push(actual.trim());
+  return trozos.filter((t) => t.length > 1);
+}
+function urlGoogle(t, i, total) {
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(t)}&tl=es&total=${total}&idx=${i}&textlen=${t.length}`;
+}
+function reproducirTexto(texto) {
+  const trozos = trocearGoogle(texto, 180);
+  const urls = trozos.map((t, i) => urlGoogle(t, i, trozos.length));
+  reproducirSecuencia(urls, parseFloat($("playback").value));
+}
+function reproducirSecuencia(urls, rate) {
+  const audio = $("player");
+  let i = 0;
+  audio.src = urls[0];
+  audio.playbackRate = rate;
+  audio.onended = () => {
+    i += 1;
+    if (i < urls.length) { audio.src = urls[i]; audio.playbackRate = rate; audio.play(); }
+  };
+  $("resultado").classList.remove("oculto");
+  audio.play().catch(() => {});
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 /* ---------------- inicio ---------------- */
 const contVoces = $("voces");
