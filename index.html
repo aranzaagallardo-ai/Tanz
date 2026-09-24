@@ -150,6 +150,24 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
   .hero h1{font-size:1.5rem}
   .card{padding:17px 15px}
 }
+
+/* ---------- código de acceso ---------- */
+#pin{position:fixed; inset:0; z-index:60;
+  background:linear-gradient(165deg,#e8f3fa 0%, #cfe8f6 60%, #b5dcf2 100%);
+  display:flex; align-items:center; justify-content:center; padding:20px}
+#pin .box{background:#fff; border-radius:24px; padding:36px 28px 30px; max-width:340px; width:100%;
+  text-align:center; box-shadow:0 24px 60px -18px rgba(2,60,100,.4)}
+#pin .marca{font-family:var(--serif); font-weight:700; font-size:1.7rem; color:var(--tinta); margin-bottom:2px}
+#pin .marca span{color:var(--celeste)}
+#pin .sub{font-size:.8rem; color:var(--gris); margin-bottom:20px}
+#pin .dots{display:flex; gap:14px; justify-content:center; margin-bottom:20px}
+#pin .dots span{width:15px; height:15px; border-radius:50%; border:2px solid var(--celeste); transition:.12s}
+#pin .dots span.lleno{background:var(--celeste)}
+#pin .teclado{display:grid; grid-template-columns:repeat(3,68px); gap:12px; justify-content:center}
+#pin .teclado button{width:68px; height:62px; border-radius:14px; border:1.5px solid var(--linea);
+  background:#fff; color:var(--tinta); font-family:Sora,Inter; font-size:1.3rem; font-weight:600; cursor:pointer; transition:.1s}
+#pin .teclado button:active{background:var(--celeste-suave); transform:scale(.96)}
+#pin .err{color:#b54a4a; font-size:.8rem; min-height:1.2em; margin-top:10px}
 </style>
 </head>
 <body>
@@ -166,6 +184,20 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
   </div>
 </div>
 
+<div id="pin" class="oculto">
+  <div class="box">
+    <div class="marca">Tanz<span>.</span></div>
+    <div class="sub">AUDIO · APUNTES · ESTUDIO</div>
+    <div class="dots"><span></span><span></span><span></span><span></span></div>
+    <div class="teclado">
+      <button data-t="1">1</button><button data-t="2">2</button><button data-t="3">3</button>
+      <button data-t="4">4</button><button data-t="5">5</button><button data-t="6">6</button>
+      <button data-t="7">7</button><button data-t="8">8</button><button data-t="9">9</button>
+      <button data-t="borrar">⌫</button><button data-t="0">0</button><button data-t="ok">✓</button>
+    </div>
+    <div class="err"></div>
+  </div>
+</div>
 <div class="escritorio">
   <aside class="sidebar">
     <div class="marca">Tanz <span class="punto"></span></div>
