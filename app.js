@@ -303,25 +303,31 @@ async function reproducirNube(d, boton) {
 
 /* ---------------- generar ---------------- */
 $("btnGenerar").addEventListener("click", async () => {
-  if (!docTexto) return;
+  if (!docTexto || $("btnGenerar").dataset.ocupado === "1") return;
+  $("btnGenerar").dataset.ocupado = "1";
   $("btnGenerar").disabled = true;
   $("barraWrap").classList.remove("oculto");
   $("barra").style.width = "35%";
-  aviso("Guardando en tu biblioteca…");
   try {
+    aviso("Guardando en tu biblioteca…");
     await subirANube(docTexto, docNombre);
     $("barra").style.width = "100%";
     aviso("Listo. Reproduciendo — también quedó en tu biblioteca.");
     const trozos = trocearParaTTS(docTexto, 180);
     const urls = trozos.map((t, i) => urlTTS(t, i, trozos.length));
-    reproducirSecuencia(urls, parseFloat($("playback").value));
+    try { reproducirSecuencia(urls, parseFloat($("playback").value)); } catch (p) { console.warn(p); }
     pintarBiblio();
   } catch (e) {
-    aviso("Error: " + e.message);
+    aviso("Error: " + e.message + " — vuelve a intentarlo.");
+  } finally {
+    $("barraWrap").classList.add("oculto");
+    delete $("btnGenerar").dataset.ocupado;
+    $("btnGenerar").disabled = false;
+    $("btnGenerar").textContent = "Generar audiolibro";
   }
-  $("barraWrap").classList.add("oculto");
-  $("btnGenerar").disabled = false;
 });
+// autoplay bloqueado nunca debe romper el flujo
+$("player").addEventListener("error", () => { console.warn("audio error"); });
 $("playback").addEventListener("change", () => { $("player").playbackRate = parseFloat($("playback").value); });
 
 /* ---------------- inicio ---------------- */
