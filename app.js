@@ -1,5 +1,5 @@
 /* Tanz — tus apuntes, en audiolibro.
-   Voz: neuronales Edge vía el puente en Render.
+   Motores: Google (instantáneo) y Neuronal Edge (vía puente Render, MP3 completo).
    Biblioteca: tu repo privado de GitHub, sincronizada entre dispositivos. */
 "use strict";
 
@@ -9,8 +9,8 @@ const CFG = {
   repo: "tanz-biblioteca",
   token: ["github_pat_11CNPKXYA0", "x5BAEzDPKHkH_HcvOeWs4RQP8qe19J2IrcNoUSGdFK2NIKir8a1kJWW3ETJDWNRGWjyjb1TO"].join(""),
 };
-const PUENTE = localStorage.getItem("tanz-puente") || "https://tanz-y18v.onrender.com";
-let vozSel = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
+let vozNeuronal = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
+let vozSel = localStorage.getItem("tanz-voz") || "es";
 let docTexto = "", docNombre = "";
 
 const $ = (id) => document.getElementById(id);
@@ -54,6 +54,37 @@ async function ghBorrar(path, sha) {
   if (!r.ok && r.status !== 404) throw new Error("GitHub " + r.status);
 }
 const ID_IDX = "index.json";
+
+/* ---------------- Git Data (guardar el MP3 en la biblioteca) ---------------- */
+async function ghBlob(b64) {
+  const r = await gh("git/blobs", { method: "POST", body: JSON.stringify({ content: b64, encoding: "base64" }) });
+  if (!r.ok) throw new Error("blob " + r.status);
+  return (await r.json()).sha;
+}
+async function ghHeadMain() {
+  const r = await gh("git/ref/heads/main");
+  if (!r.ok) throw new Error("ref " + r.status);
+  return (await r.json()).object.sha;
+}
+async function ghGuardarPartes(entradas, mensaje) {
+  const baseSha = await ghHeadMain();
+  const r = await gh("git/trees", { method: "POST", body: JSON.stringify({ base_tree: baseSha, tree: entradas }) });
+  if (!r.ok) throw new Error("tree " + r.status);
+  const treeSha = (await r.json()).sha;
+  const c = await gh("git/commits", { method: "POST", body: JSON.stringify({ message: mensaje, tree: treeSha, parents: [baseSha] }) });
+  if (!c.ok) throw new Error("commit " + c.status);
+  const commitSha = (await c.json()).sha;
+  const u = await gh("git/refs/heads/main", { method: "PATCH", body: JSON.stringify({ sha: commitSha }) });
+  if (!u.ok) throw new Error("ref " + u.status);
+  return commitSha;
+}
+async function ghBlobRaw(sha) {
+  const r = await gh("git/blobs/" + sha);
+  if (!r.ok) throw new Error("blob read " + r.status);
+  const j = await r.json();
+  const bin = Uint8Array.from(atob(j.content), (c) => c.charCodeAt(0));
+  return new Blob([bin], { type: "audio/mpeg" });
+}
 
 /* ---------------- limpieza de texto ---------------- */
 const UNIDADES = [
@@ -196,7 +227,7 @@ async function cargar(file) {
   aviso("");
 }
 
-/* ---------------- síntesis por trozos (puente neuronal) ---------------- */
+/* ---------------- trocear ---------------- */
 function trocearParaTTS(texto, max = 550) {
   const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
   const trozos = [];
@@ -207,6 +238,89 @@ function trocearParaTTS(texto, max = 550) {
   }
   if (actual.trim()) trozos.push(actual.trim());
   return trozos;
+}
+
+/* ---------------- motor neuronal (vía puente Render) ---------------- */
+async function synthPuente(trozo, voz, rate, intento = 1) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000); // 1er intento puede despertar el servidor
+  try {
+    const r = await fetch(PUENTE + "/tts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: trozo, voice: voz, rate }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (r.status === 502) throw new Error("el servicio no respondió bien");
+    if (!r.ok) throw new Error("puente " + r.status);
+    return await r.blob();
+  } catch (e) {
+    clearTimeout(t);
+    throw e;
+  }
+}
+async function synthNeuronal(texto, voz, rate, avisoFn) {
+  const trozos = trocearParaTTS(texto, 500);
+  const partes = [];
+  for (let i = 0; i < trozos.length; i++) {
+    avisoFn(`Parte ${i + 1} de ${trozos.length}…`);
+    let ok = false, err = null;
+    for (const reintento of [1, 2]) {
+      try {
+        partes.push(await synthPuente(trozos[i], voz, rate));
+        ok = true; break;
+      } catch (e) {
+        err = e;
+        avisoFn(`Parte ${i + 1} de ${trozos.length} — reintento ${reintento}…`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+    if (!ok) throw err || new Error("falló una parte");
+  }
+  return new Blob(partes, { type: "audio/mpeg" });
+}
+
+/* ---------------- reproducción Google (instantánea) ---------------- */
+function trocearGoogle(texto, max = 180) {
+  const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
+  const trozos = [];
+  let actual = "";
+  for (const o of partes) {
+    let frag = o;
+    while (frag.length > max) {
+      let corte = frag.lastIndexOf(" ", max);
+      if (corte < max * 0.4) corte = max;
+      trozos.push((actual ? actual + " " : "") + frag.slice(0, corte).trim());
+      actual = "";
+      frag = frag.slice(corte).trim();
+    }
+    actual = (actual ? actual + " " : "") + frag;
+    if (actual.length >= max) { trozos.push(actual.trim()); actual = ""; }
+  }
+  if (actual.trim()) trozos.push(actual.trim());
+  return trozos.filter((t) => t.length > 1);
+}
+function urlGoogle(t, i, total) {
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(t)}&tl=es&total=${total}&idx=${i}&textlen=${t.length}`;
+}
+function reproducirTexto(texto) {
+  const trozos = trocearGoogle(texto, 180);
+  const urls = trozos.map((t, i) => urlGoogle(t, i, trozos.length));
+  reproducirSecuencia(urls, parseFloat($("playback").value));
+}
+function reproducirSecuencia(urls, rate) {
+  const audio = $("player");
+  let i = 0;
+  audio.src = urls[0];
+  audio.playbackRate = rate;
+  audio.onended = () => {
+    i += 1;
+    if (i < urls.length) { audio.src = urls[i]; audio.playbackRate = rate; audio.play(); }
+  };
+  $("resultado").classList.remove("oculto");
+  audio.play().catch(() => {});
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* ---------------- biblioteca ---------------- */
@@ -256,7 +370,13 @@ async function reproducirNube(d, boton) {
     const f = await ghLeer(`docs/${d.id}/texto.json`);
     if (!f) throw new Error("no encontrado");
     const texto = JSON.parse(await f.blob.text()).texto;
-    reproducirTexto(texto);
+    try {
+      await synthNeuronal(texto, vozSel, "+0%", aviso);
+      aviso("Listo.");
+    } catch (e2) {
+      aviso("Puente no disponible — usando voz alternativa…");
+      reproducirTexto(texto);
+    }
   } catch (e) { alert("No pude cargar: " + e.message); }
   boton.textContent = "Escuchar";
 }
@@ -270,121 +390,55 @@ async function borrarDoc(id) {
   }
 }
 
-/* ---------------- reproducción (Google, secuencial, sin servidor) ---------------- */
-function trocearGoogle(texto, max = 180) {
-  const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
-  const trozos = [];
-  let actual = "";
-  for (const o of partes) {
-    let frag = o;
-    while (frag.length > max) {
-      let corte = frag.lastIndexOf(" ", max);
-      if (corte < max * 0.4) corte = max;
-      trozos.push((actual ? actual + " " : "") + frag.slice(0, corte).trim());
-      actual = "";
-      frag = frag.slice(corte).trim();
-    }
-    actual = (actual ? actual + " " : "") + frag;
-    if (actual.length >= max) { trozos.push(actual.trim()); actual = ""; }
-  }
-  if (actual.trim()) trozos.push(actual.trim());
-  return trozos.filter((t) => t.length > 1);
-}
-function urlGoogle(t, i, total) {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(t)}&tl=es&total=${total}&idx=${i}&textlen=${t.length}`;
-}
-/* ---------------- motor neuronal (vía puente) ---------------- */
-async function synthPuente(trozo, voz, rate, intento = 1) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000); // 1er intento puede despertar el servidor
+/* ---------------- generar: dos motores ---------------- */
+$("btnGenerar").addEventListener("click", async () => {
+  if (!docTexto) return;
+  $("btnGenerar").disabled = true;
+  aviso("Guardando en tu biblioteca…");
   try {
-    const r = await fetch(PUENTE + "/tts", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: trozo, voice: voz, rate }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    if (r.status === 502) throw new Error("el servicio no respondió bien");
-    if (!r.ok) throw new Error("puente " + r.status);
-    return await r.blob();
-  } catch (e) {
-    clearTimeout(t);
-    throw e;
-  }
-}
-async function synthNeuronal(texto, voz, rate, avisoFn) {
-  const trozos = trocearParaTTS(texto, 500);
-  const partes = [];
-  for (let i = 0; i < trozos.length; i++) {
-    if (i === 0) avisoFn("Despertando el servidor de voces… (solo la primera vez)");
-    let ok = false, err = null;
-    for (const reintento of [1, 2]) {
-      try {
-        partes.push(await synthPuente(trozos[i], voz, rate));
-        ok = true; break;
-      } catch (e) {
-        err = e;
-        avisoFn(`Parte ${i + 1} de ${trozos.length} — reintento ${reintento}…`);
-        await new Promise((r) => setTimeout(r, 1500));
-      }
+    await guardarDoc(docTexto, docNombre);
+    pintarBiblio();
+    try {
+      await synthNeuronal(docTexto, vozSel, "+0%", aviso);
+      aviso("Guardado. Reproduciendo…");
+      reproducirTexto(docTexto);
+    } catch (e) {
+      aviso("Guardado. Puente no disponible — reproduciendo con voz alternativa…");
+      reproducirTexto(docTexto);
     }
-    if (!ok) throw err || new Error("falló una parte");
-    avisoFn(`Sintetizando parte ${i + 1} de ${trozos.length}…`);
+  } catch (e) {
+    aviso("Error: " + e.message);
+  } finally {
+    $("btnGenerar").disabled = false;
   }
-  return new Blob(partes, { type: "audio/mpeg" });
-}
+});
 
-function reproducirTexto(texto) {
-  const trozos = trocearGoogle(texto, 180);
-  const urls = trozos.map((t, i) => urlGoogle(t, i, trozos.length));
-  reproducirSecuencia(urls, parseFloat($("playback").value));
-}
-function reproducirSecuencia(urls, rate) {
-  const audio = $("player");
-  let i = 0;
-  audio.src = urls[0];
-  audio.playbackRate = rate;
-  audio.onended = () => {
-    i += 1;
-    if (i < urls.length) { audio.src = urls[i]; audio.playbackRate = rate; audio.play(); }
-  };
-  $("resultado").classList.remove("oculto");
-  audio.play().catch(() => {});
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-/* ---------------- motor neuronal: botón y flujo ---------------- */
 $("btnNeuronal").addEventListener("click", async () => {
   if (!docTexto || $("btnNeuronal").dataset.ocupado === "1") return;
   $("btnNeuronal").dataset.ocupado = "1";
   $("btnNeuronal").disabled = true;
   $("btnGenerar").disabled = true;
-  const voz = vozSel === "es" ? "es-CL-CatalinaNeural" : (vozSel === "es-MX" ? "es-MX-DaliaNeural" : "es-ES-ElviraNeural");
-  const rate = "+0%";
+  $("barraWrap").classList.remove("oculto");
+  const MAPA = { "es": "es-CL-CatalinaNeural", "es-MX": "es-MX-DaliaNeural", "es-ES": "es-ES-ElviraNeural" };
+  const voz = MAPA[vozSel] || "es-CL-CatalinaNeural";
   try {
-    $("barraWrap").classList.remove("oculto");
-    const texto = docTexto;
-    await guardarDoc(texto, docNombre);
-    const trozos = trocearParaTTS(texto, 500);
+    const trozos = trocearParaTTS(docTexto, 500);
     const partes = [];
-    let fallo = null;
     for (let i = 0; i < trozos.length; i++) {
-      if (i === 0) aviso("Despertando el servidor de voces… (solo la primera vez)");
+      aviso(`Voz neuronal: parte ${i + 1} de ${trozos.length}…`);
       let ok = false, err = null;
       for (const reintento of [1, 2]) {
         try {
-          partes.push(await synthPuente(trozos[i], voz, rate));
+          partes.push(await synthPuente(trozos[i], voz, "+0%"));
           ok = true; break;
         } catch (e) {
           err = e;
-          aviso(`Voz neuronal: parte ${i + 1} de ${trozos.length} — reintento ${reintento}…`);
+          aviso(`Parte ${i + 1} de ${trozos.length} — reintento ${reintento}…`);
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
       if (!ok) throw err || new Error("falló una parte");
       $("barra").style.width = (100 * (i + 1) / trozos.length) + "%";
-      aviso(`Voz neuronal: parte ${i + 1} de ${trozos.length}…`);
     }
     aviso("Voz neuronal lista. Reproduciendo…");
     const blob = new Blob(partes, { type: "audio/mpeg" });
@@ -405,6 +459,7 @@ $("btnNeuronal").addEventListener("click", async () => {
 const PIN_KEY = "tanz-pin-v1";
 let pinBuffer = "";
 let pinFase = null;
+let appIniciada = false;
 
 function pinRefrescar() {
   const dots = document.querySelectorAll("#pin .dots span");
@@ -417,15 +472,15 @@ function pinTecla(t) {
   pinRefrescar();
   if (pinBuffer.length === 4) pinResolver();
 }
-function pinResolver() {
+async function pinResolver() {
   const err = document.querySelector("#pin .err");
   const hash = btoa(unescape(encodeURIComponent("tanz." + pinBuffer + ".acceso")));
   if (pinFase === "crear") {
     localStorage.setItem("tanz-pin-borrador", hash);
     pinFase = "confirmar"; pinBuffer = "";
     document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
-    $("pinTitulo").textContent = "Confírmalo";
     err.textContent = "";
+    document.getElementById("pinTitulo").textContent = "Confírmalo";
     return;
   }
   if (pinFase === "confirmar") {
@@ -443,24 +498,43 @@ function pinResolver() {
       return;
     }
   }
-  $("pin").classList.add("oculto");
+  document.getElementById("pin").classList.add("oculto");
   iniciarApp();
 }
 document.querySelectorAll("#pin .teclado button").forEach((b) => {
   b.addEventListener("click", () => pinTecla(b.dataset.t));
 });
+function pinAbrir(fase, sub) {
+  pinFase = fase; pinBuffer = "";
+  const titulo = document.getElementById("pinTitulo");
+  if (titulo) titulo.textContent = fase === "entrar" ? "Tu código de acceso" : "Crea tu código de acceso";
+  const subEl = document.querySelector("#pin .sub");
+  if (subEl) subEl.textContent = sub;
+  document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
+  document.getElementById("pin").classList.remove("oculto");
+  pinRefrescar();
+}
+function iniciarApp() {
+  if (appIniciada) return;
+  appIniciada = true;
+  }
 function pinIniciar() {
   const guardado = localStorage.getItem(PIN_KEY);
-  if (guardado) pinAbrir("entrar", "Tu código de acceso");
-  else pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
-  $("pin").classList.remove("oculto");
+  if (guardado) {
+    pinAbrir("entrar", "");
+  } else {
+    pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
+  }
+  document.getElementById("pin").classList.remove("oculto");
 }
 
 const contVoces = $("voces");
 const VOCES = [
-  { id: "es", nombre: "Español neutro" },
-  { id: "es-MX", nombre: "Español México" },
-  { id: "es-ES", nombre: "Español España" },
+  { id: "es-CL-CatalinaNeural", nombre: "Catalina · Chile" },
+  { id: "es-MX-DaliaNeural", nombre: "Dalia · México" },
+  { id: "es-ES-ElviraNeural", nombre: "Elvira · España" },
+  { id: "es-CL-LorenzoNeural", nombre: "Lorenzo · Chile" },
+  { id: "es-US-PalomaNeural", nombre: "Paloma · EE.UU." },
 ];
 for (const v of VOCES) {
   const b = document.createElement("button");
@@ -473,11 +547,4 @@ for (const v of VOCES) {
   };
   contVoces.appendChild(b);
 }
-let appIniciada = false;
-function iniciarApp() {
-  if (appIniciada) return;
-  appIniciada = true;
-  pintarBiblio().catch(() => {});
-}
-if (!localStorage.getItem(PIN_KEY)) pinIniciar();
-else { document.getElementById("pin").classList.add("oculto"); iniciarApp(); }
+pinIniciar();
