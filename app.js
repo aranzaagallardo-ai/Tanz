@@ -1,23 +1,18 @@
 /* Tanz — tus apuntes, en audiolibro.
-   Motores: Google (instantáneo) y Neuronal Edge (vía puente Render, MP3 completo).
-   Biblioteca: tu repo privado de GitHub, sincronizada entre dispositivos. */
+   Motor neuronal Edge vía puente Render · Fish Audio opcional · biblioteca local. */
 "use strict";
 
 /* ---------------- código de acceso (4 dígitos) ---------------- */
 const PIN_KEY = "tanz-pin-v1";
-let pinBuffer = "";
-let pinFase = null;
-let appIniciada = false;
+let pinBuffer = "", pinFase = null, appIniciada = false;
 
 function pinRefrescar() {
-  const dots = document.querySelectorAll("#pin .dots span");
-  dots.forEach((d, i) => d.classList.toggle("lleno", i < pinBuffer.length));
+  document.querySelectorAll("#pin .dots span").forEach((d, i) => d.classList.toggle("lleno", i < pinBuffer.length));
 }
 function pinTecla(t) {
   if (t === "borrar") { pinBuffer = pinBuffer.slice(0, -1); pinRefrescar(); return; }
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += t;
-  pinRefrescar();
+  if (t === "ok" || pinBuffer.length >= 4) return;
+  pinBuffer += t; pinRefrescar();
   if (pinBuffer.length === 4) pinResolver();
 }
 async function pinResolver() {
@@ -52,113 +47,75 @@ async function pinResolver() {
 document.querySelectorAll("#pin .teclado button").forEach((b) => {
   b.addEventListener("click", () => pinTecla(b.dataset.t));
 });
-function pinAbrir(fase, sub) {
-  pinFase = fase; pinBuffer = "";
-  const titulo = document.getElementById("pinTitulo");
-  if (titulo) titulo.textContent = fase === "entrar" ? "Tu código de acceso" : "Crea tu código de acceso";
-  const subEl = document.querySelector("#pin .sub");
-  if (subEl) subEl.textContent = sub;
-  document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
-  document.getElementById("pin").classList.remove("oculto");
-  pinRefrescar();
-}
 function pinIniciar() {
   const guardado = localStorage.getItem(PIN_KEY);
   pinFase = guardado ? "entrar" : "crear";
   pinBuffer = "";
-  const titulo = document.getElementById("pinTitulo");
-  if (titulo) titulo.textContent = guardado ? "Tu código de acceso" : "Elige 4 dígitos: serán tu código de acceso";
+  document.getElementById("pinTitulo").textContent = guardado ? "Tu código de acceso" : "Elige 4 dígitos: serán tu código de acceso";
   document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
   document.getElementById("pin").classList.remove("oculto");
 }
 function iniciarApp() {
   if (appIniciada) return;
   appIniciada = true;
-  try { pintarBiblio(); } catch (e) {}
+  document.getElementById("escritorio").classList.remove("oculto");
+  pintarBiblio();
 }
 
 /* ---------------- configuración ---------------- */
-const CFG = {
-  user: "aranzaagallardo-ai",
-  repo: "tanz-biblioteca",
-  token: ["github_pat_11CNPKXYA0", "x5BAEzDPKHkH_HcvOeWs4RQP8qe19J2IrcNoUSGdFK2NIKir8a1kJWW3ETJDWNRGWjyjb1TO"].join(""),
-};
-let vozSel = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
-let velocidad = 1;
 const PUENTE = "https://tanz-y18v.onrender.com";
-let docTexto = "", docNombre = "";
+const VOCES = [
+  { id: "es-CL-CatalinaNeural", nombre: "Catalina", pais: "Chile" },
+  { id: "es-CL-LorenzoNeural", nombre: "Lorenzo", pais: "Chile" },
+  { id: "es-MX-DaliaNeural", nombre: "Dalia", pais: "México" },
+  { id: "es-MX-JorgeNeural", nombre: "Jorge", pais: "México" },
+  { id: "es-AR-ElenaNeural", nombre: "Elena", pais: "Argentina" },
+  { id: "es-UY-ValentinaNeural", nombre: "Valentina", pais: "Uruguay" },
+  { id: "es-ES-ElviraNeural", nombre: "Elvira", pais: "España" },
+  { id: "es-ES-AlvaroNeural", nombre: "Álvaro", pais: "España" },
+];
+let vozSel = localStorage.getItem("tanz-voz") || VOCES[0].id;
+if (!VOCES.some((v) => v.id === vozSel)) vozSel = VOCES[0].id;
+let velocidad = parseFloat(localStorage.getItem("tanz-vel") || "1");
 
 const $ = (id) => document.getElementById(id);
-const aviso = (m) => { $("aviso").textContent = m || ""; };
+function toast(m) {
+  let t = document.createElement("div");
+  t.className = "aviso-flotante"; t.textContent = m;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
 
-/* ---------------- GitHub API ---------------- */
-function gh(path, opts = {}) {
+/* ---------------- Fish Audio (voz clonada) ---------------- */
+function fishActivo() { return !!(localStorage.getItem("tanz-fish-key") && localStorage.getItem("tanz-fish-ref")); }
+async function synthFish(trozo, intento = 1) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 30000);
-  return fetch(`https://api.github.com/repos/${CFG.user}/${CFG.repo}/${path}`, {
-    ...opts,
-    headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github+json", ...(opts.headers || {}) },
-    signal: ctrl.signal,
-  }).finally(() => clearTimeout(t));
+  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000);
+  try {
+    const r = await fetch(PUENTE + "/fish", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: localStorage.getItem("tanz-fish-key"), reference_id: localStorage.getItem("tanz-fish-ref"), text: trozo }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!r.ok) throw new Error("Fish Audio " + r.status);
+    return await r.blob();
+  } catch (e) { clearTimeout(t); throw e; }
 }
-async function ghLeerJSON(path) {
-  const r = await gh(path);
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error("GitHub " + r.status);
-  const j = await r.json();
-  const raw = await fetch(j.url, { headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github.raw" } });
-  return { sha: j.sha, data: await raw.json() };
-}
-async function ghLeerArchivo(path) {
-  const r = await gh(path);
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error("GitHub " + r.status);
-  const j = await r.json();
-  const raw = await fetch(j.url, { headers: { Authorization: `Bearer ${CFG.token}`, Accept: "application/vnd.github.raw" } });
-  return { sha: j.sha, blob: await raw.blob() };
-}
-async function ghEscribirJSON(path, data, mensaje, sha) {
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 1))));
-  const body = { message: mensaje, content };
-  if (sha) body.sha = sha;
-  const r = await gh(path, { method: "PUT", body: JSON.stringify(body) });
-  if (!r.ok) throw new Error("GitHub " + r.status);
-}
-async function ghBorrar(path, sha) {
-  const r = await gh(path, { method: "DELETE", body: JSON.stringify({ message: "borrar " + path, sha }) });
-  if (!r.ok && r.status !== 404) throw new Error("GitHub " + r.status);
-}
-const ID_IDX = "index.json";
-
-/* ---------------- Git Data (MP3 completo en la biblioteca) ---------------- */
-async function ghBlob(b64) {
-  const r = await gh("git/blobs", { method: "POST", body: JSON.stringify({ content: b64, encoding: "base64" }) });
-  if (!r.ok) throw new Error("blob " + r.status);
-  return (await r.json()).sha;
-}
-async function ghHeadMain() {
-  const r = await gh("git/ref/heads/main");
-  if (!r.ok) throw new Error("ref " + r.status);
-  return (await r.json()).object.sha;
-}
-async function ghGuardarPartes(entradas, mensaje) {
-  const baseSha = await ghHeadMain();
-  const r = await gh("git/trees", { method: "POST", body: JSON.stringify({ base_tree: baseSha, tree: entradas }) });
-  if (!r.ok) throw new Error("tree " + r.status);
-  const treeSha = (await r.json()).sha;
-  const c = await gh("git/commits", { method: "POST", body: JSON.stringify({ message: mensaje, tree: treeSha, parents: [baseSha] }) });
-  if (!c.ok) throw new Error("commit " + c.status);
-  const commitSha = (await c.json()).sha;
-  const u = await gh("git/refs/heads/main", { method: "PATCH", body: JSON.stringify({ sha: commitSha }) });
-  if (!u.ok) throw new Error("ref " + u.status);
-  return commitSha;
-}
-async function ghBlobRaw(sha) {
-  const r = await gh("git/blobs/" + sha);
-  if (!r.ok) throw new Error("blob read " + r.status);
-  const j = await r.json();
-  const bin = Uint8Array.from(atob(j.content), (c) => c.charCodeAt(0));
-  return new Blob([bin], { type: "audio/mpeg" });
+async function synthPuente(trozo, voz, rate = "+0%", intento = 1) {
+  if (voz === "fish") return synthFish(trozo, intento);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000);
+  try {
+    const r = await fetch(PUENTE + "/tts", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: trozo, voice: voz, rate }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!r.ok) throw new Error("puente " + r.status);
+    return await r.blob();
+  } catch (e) { clearTimeout(t); throw e; }
 }
 
 /* ---------------- limpieza de texto ---------------- */
@@ -169,36 +126,25 @@ const UNIDADES = [
   [/\bvo\b/g, "oral"], [/\bTV\b/g, "tacto vaginal"], [/\bRCF\b/g, "registro cardiovascular fetal"],
 ];
 function limpiar(t) {
-  const map = {
-    "➝": ",", "→": " a ", "≥": "mayor o igual que ", "≤": "menor o igual que ",
-    "≈": "aproximadamente ", "×": " por ", "✦": "", "N°": "número ", "n°": "número ",
-    "&": " y ", "%": " por ciento", "↑": "aumenta ", "↓": "disminuye ", "—": " — ",
-    "“": '"', "”": '"', "•": ",", "·": ",", "▪": ",", "‣": ",", "│": " ",
-  };
+  const map = { "➝": ",", "→": " a ", "≥": "mayor o igual que ", "≤": "menor o igual que ", "≈": "aproximadamente ", "×": " por ", "✦": "", "N°": "número ", "n°": "número ", "&": " y ", "%": " por ciento", "↑": "aumenta ", "↓": "disminuye ", "—": " — ", "“": '"', "”": '"', "•": ",", "·": ",", "▪": ",", "‣": ",", "│": " " };
   t = t.replace(/[➝→≥≤≈×✦N°n°&%↑↓—“”•·▪‣│]/g, (c) => map[c] ?? c);
   for (const [re, v] of UNIDADES) t = t.replace(re, v);
-  t = t.replace(/(\d)[ \t]+(?=\d)/g, "$1");
-  t = t.replace(/[\u2010\u00ad]\s*/g, "");
-  t = t.replace(/,\s*—\s*,?\s*/g, " — ");
-  t = t.replace(/(?:,\s*){2,}/g, ", ");
-  t = t.replace(/\s{2,}/g, " ");
+  t = t.replace(/(\d)[ \t]+(?=\d)/g, "$1").replace(/[\u2010\u00ad]\s*/g, "");
+  t = t.replace(/,\s*—\s*,?\s*/g, " — ").replace(/(?:,\s*){2,}/g, ", ").replace(/\s{2,}/g, " ");
   return t;
 }
 function limpiarMarkdown(t) {
   t = t.replace(/<img[^>]*>|<figure[^>]*>|<\/figure>/g, " ");
-  t = t.replace(/<\/t[dh]>\s*<t[dh][^>]*>/g, " — ");
-  t = t.replace(/<\/tr>\s*<tr[^>]*>/g, ".\n");
+  t = t.replace(/<\/t[dh]>\s*<t[dh][^>]*>/g, " — ").replace(/<\/tr>\s*<tr[^>]*>/g, ".\n");
   t = t.replace(/<\/?(table|thead|tbody|tr|td|th)[^>]*>/g, " ");
   t = t.replace(/^#{1,6} (.+)$/gm, "$1.");
   t = t.replace(/\*\*(.+?)\*\*/g, "$1");
-  t = t.replace(/^\s*[-•] /gm, ". ");
-  t = t.replace(/^\s*(\d+)\. /gm, ". $1: ");
+  t = t.replace(/^\s*[-•] /gm, ". ").replace(/^\s*(\d+)\. /gm, ". $1: ");
   return t;
 }
 
 /* ---------------- extracción PDF ---------------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
 async function pdfATexto(arrayBuffer, progreso) {
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const paginas = [];
@@ -264,313 +210,341 @@ async function pdfATexto(arrayBuffer, progreso) {
     .join("\n\n");
 }
 
-/* ---------------- entrada de archivo ---------------- */
-$("drop").addEventListener("click", () => $("archivo").click());
-$("drop").addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("on"); });
-$("drop").addEventListener("dragleave", () => $("drop").classList.remove("on"));
-$("drop").addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("on"); if (e.dataTransfer.files[0]) cargar(e.dataTransfer.files[0]); });
-$("archivo").addEventListener("change", (e) => { if (e.target.files[0]) cargar(e.target.files[0]); });
+/* ---------------- entrada de documento ---------------- */
+const drop = $("drop"), inputArchivo = $("archivo");
+drop.addEventListener("click", () => inputArchivo.click());
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("on"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("on"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("on"); if (e.dataTransfer.files[0]) cargar(e.dataTransfer.files[0]); });
+inputArchivo.addEventListener("change", (e) => { if (e.target.files[0]) cargar(e.target.files[0]); });
+$("btnAgregar").addEventListener("click", () => inputArchivo.click());
+
+let docActual = null; // {id, nombre, frases[], trozos[{texto,desde,hasta}], partes[], blobTotal}
 
 async function cargar(file) {
-  docNombre = file.name.replace(/\.(pdf|md|txt|markdown)$/i, "");
-  docTexto = "";
-  $("resultado").classList.add("oculto");
-  aviso("Leyendo documento…");
+  const nombre = file.name.replace(/\.(pdf|md|txt|markdown)$/i, "");
+  let texto = "";
+  toast("Leyendo " + nombre + "…");
   try {
-    if (/\.pdf$/i.test(file.name)) {
-      docTexto = await pdfATexto(await file.arrayBuffer(), (n, tot) => aviso(`Leyendo página ${n} de ${tot}…`));
-    } else {
-      let t = await file.text();
-      if (/\.md|\.markdown$/i.test(file.name)) t = limpiarMarkdown(t);
-      docTexto = t;
+    if (/\.pdf$/i.test(file.name)) texto = await pdfATexto(await file.arrayBuffer(), (n, tot) => toast(`Leyendo página ${n} de ${tot}…`));
+    else {
+      texto = await file.text();
+      if (/\.md|\.markdown$/i.test(file.name)) texto = limpiarMarkdown(texto);
     }
-    docTexto = limpiar(docTexto).replace(/\n{3,}/g, "\n\n").trim();
-  } catch (e) {
-    aviso("No pude leer el archivo: " + e.message);
-    return;
-  }
-  if (docTexto.length < 40) { aviso("El documento no tiene texto legible (¿es un escaneo sin OCR?)."); return; }
-  const mins = Math.round(docTexto.length / 14.5 / 60);
-  $("nombreSpan").textContent = docNombre;
-  $("nombreDoc").classList.remove("oculto");
-  $("preview").textContent = docTexto.slice(0, 1500) + (docTexto.length > 1500 ? "…" : "");
-  $("preview").classList.remove("oculto");
-  $("stats").innerHTML = `<span class="pill">${docTexto.length.toLocaleString("es")} caracteres</span><span class="pill">≈ ${mins} min de audio</span>`;
-  $("stats").classList.remove("oculto");
-  $("btnGenerar").disabled = false;
-  $("btnNeuronal").disabled = false;
-  aviso("");
+  } catch (e) { toast("No pude leer el archivo: " + e.message); return; }
+  texto = limpiar(texto).replace(/\n{3,}/g, "\n\n").trim();
+  if (texto.length < 40) { toast("El documento no tiene texto legible (¿es un escaneo sin OCR?)."); return; }
+  abrirLectura(nombre, texto);
 }
 
-/* ---------------- síntesis por trozos (puente) ---------------- */
-function trocearParaTTS(texto, max = 550) {
-  const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
-  const trozos = [];
-  let actual = "";
-  for (const o of partes) {
-    if ((actual + " " + o).length > max && actual) { trozos.push(actual.trim()); actual = o; }
-    else actual = (actual ? actual + " " : "") + o;
+/* ---------------- vista lectura ---------------- */
+function dividirFrases(texto) {
+  const frases = [];
+  for (const parrafo of texto.split(/\n{2,}|\n/)) {
+    const limpio = parrafo.trim();
+    if (!limpio) continue;
+    const partes = limpio.split(/(?<=[.!?;:])\s+/).map((x) => x.trim()).filter(Boolean);
+    partes.forEach((f, i) => frases.push({ texto: f, nuevoParrafo: i === 0 }));
   }
-  if (actual.trim()) trozos.push(actual.trim());
+  return frases;
+}
+function trocearPorFrases(frases, max = 2000) {
+  const trozos = [];
+  let actual = "", desde = null;
+  frases.forEach((f, i) => {
+    if ((actual + " " + f.texto).length > max && actual) {
+      trozos.push({ texto: actual.trim(), desde, hasta: i - 1 });
+      actual = ""; desde = null;
+    }
+    if (!actual) desde = i;
+    actual += (actual ? " " : "") + f.texto;
+  });
+  if (actual.trim()) trozos.push({ texto: actual.trim(), desde, hasta: frases.length - 1 });
   return trozos;
 }
-
-/* ---------------- motor neuronal (vía puente Render) ---------------- */
-function fishActivo() { return !!(localStorage.getItem("tanz-fish-key") && localStorage.getItem("tanz-fish-ref")); }
-async function synthFish(trozo, intento = 1) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000);
-  try {
-    const r = await fetch(PUENTE + "/fish", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        key: localStorage.getItem("tanz-fish-key"),
-        reference_id: localStorage.getItem("tanz-fish-ref"),
-        text: trozo,
-      }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    if (!r.ok) {
-      const detalle = await r.text().catch(() => "");
-      throw new Error("Fish Audio " + r.status + (detalle ? ": " + detalle.slice(0, 120) : ""));
-    }
-    return await r.blob();
-  } catch (e) { clearTimeout(t); throw e; }
-}
-async function synthPuente(trozo, voz, rate, intento = 1) {
-  if (voz === "fish") return synthFish(trozo, intento);
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), intento === 1 ? 90000 : 45000); // 1er intento puede despertar el servidor
-  try {
-    const r = await fetch(PUENTE + "/tts", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: trozo, voice: voz, rate }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    if (r.status === 502) throw new Error("el servicio no respondió bien");
-    if (!r.ok) throw new Error("puente " + r.status);
-    return await r.blob();
-  } catch (e) {
-    clearTimeout(t);
-    throw e;
-  }
-}
-/* ---------------- reproducción Google (instantánea) ---------------- */
-function trocearGoogle(texto, max = 180) {
-  const partes = texto.replace(/\n+/g, " ").split(/(?<=[.!?;:])\s+/);
-  const trozos = [];
-  let actual = "";
-  for (const o of partes) {
-    let frag = o;
-    while (frag.length > max) {
-      let corte = frag.lastIndexOf(" ", max);
-      if (corte < max * 0.4) corte = max;
-      trozos.push((actual ? actual + " " : "") + frag.slice(0, corte).trim());
-      actual = "";
-      frag = frag.slice(corte).trim();
-    }
-    actual = (actual ? actual + " " : "") + frag;
-    if (actual.length >= max) { trozos.push(actual.trim()); actual = ""; }
-  }
-  if (actual.trim()) trozos.push(actual.trim());
-  return trozos.filter((t) => t.length > 1);
-}
-function urlGoogle(t, i, total) {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(t)}&tl=es&total=${total}&idx=${i}&textlen=${t.length}`;
-}
-function reproducirTexto(texto) {
-  const trozos = trocearGoogle(texto, 180);
-  const urls = trozos.map((t, i) => urlGoogle(t, i, trozos.length));
-  reproducirSecuencia(urls);
-}
-function reproducirSecuencia(urls) {
-  const audio = $("player");
-  let i = 0;
-  audio.src = urls[0];
-  audio.playbackRate = velocidad;
-  audio.onended = () => {
-    i += 1;
-    if (i < urls.length) { audio.src = urls[i]; audio.playbackRate = velocidad; audio.play(); }
-  };
-  $("resultado").classList.remove("oculto");
-  audio.play().catch(() => {});
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-function playerSet(url, nombre) {
-  const audio = $("player");
-  audio.src = url;
-  audio.playbackRate = velocidad;
-  const dl = $("btnDescargar");
-  dl.href = url;
-  dl.download = (nombre || docNombre || "tanz") + ".mp3";
-  dl.style.display = "";
-  $("resultado").classList.remove("oculto");
-  $("btnDescargar").style.display = "none"; // audio por partes: sin descarga de un solo trozo
-  audio.play().catch(() => {});
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-function fmtSeg(seg) {
-  seg = Math.max(0, Math.floor(seg || 0));
-  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), ss = seg % 60;
-  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0");
-}
-const player = $("player");
-player.addEventListener("timeupdate", () => {
-  if (!player.duration) return;
-  $("fill").style.width = (100 * player.currentTime / player.duration) + "%";
-  $("tActual").textContent = fmtSeg(player.currentTime);
-  $("tTotal").textContent = fmtSeg(player.duration);
-});
-function refrescarPlay() { $("btnPlay").textContent = player.paused ? "▶" : "⏸"; }
-player.addEventListener("play", refrescarPlay);
-player.addEventListener("pause", refrescarPlay);
-player.addEventListener("ended", refrescarPlay);
-$("btnPlay").addEventListener("click", () => { if (!player.src) return; player.paused ? player.play() : player.pause(); });
-$("btnAtras").addEventListener("click", () => { player.currentTime = Math.max(0, player.currentTime - 15); });
-$("btnAdelante").addEventListener("click", () => { player.currentTime = Math.min(player.duration || 0, player.currentTime + 15); });
-$("track").addEventListener("click", (e) => {
-  if (!player.duration) return;
-  const r = e.currentTarget.getBoundingClientRect();
-  player.currentTime = player.duration * (e.clientX - r.left) / r.width;
-});
-$("vels").querySelectorAll("button").forEach((b) => {
-  b.addEventListener("click", () => {
-    velocidad = parseFloat(b.dataset.v);
-    player.playbackRate = velocidad;
-    $("vels").querySelectorAll("button").forEach((x) => x.classList.remove("sel"));
-    b.classList.add("sel");
-  });
-});
-
-/* ---------------- biblioteca (en este dispositivo) ---------------- */
-const BIBLIO_KEY = "tanz-biblio";
-function biblioLeer() {
-  try { return JSON.parse(localStorage.getItem(BIBLIO_KEY) || "[]"); } catch (e) { return []; }
-}
-function guardarLocal(texto, nombre) {
-  const lista = biblioLeer();
-  const id = "d" + Date.now().toString(36);
-  lista.unshift({ id, nombre, fecha: new Date().toISOString(), chars: texto.length, texto });
-  while (lista.length > 12) lista.pop(); // la biblioteca guarda hasta 12 documentos
-  localStorage.setItem(BIBLIO_KEY, JSON.stringify(lista));
-}
-function pintarBiblio() {
-  const cont = $("biblioteca");
-  const docs = biblioLeer();
-  if (!docs.length) { cont.innerHTML = '<div class="vacio">Tu biblioteca está vacía: genera un audiolibro.</div>'; return; }
+function abrirLectura(nombre, texto) {
+  const frases = dividirFrases(texto);
+  if (!frases.length) { toast("El documento no tiene contenido legible."); return; }
+  const cont = $("textoLectura");
   cont.innerHTML = "";
-  for (const d of docs) {
-    const div = document.createElement("div");
-    div.className = "doc-item";
-    const kb = Math.round((d.chars || 0) / 100) / 10;
-    div.innerHTML = `<div class="info"><b></b><small>${new Date(d.fecha).toLocaleDateString("es-CL")} · ${kb}k caracteres</small></div>`;
-    div.querySelector("b").textContent = d.nombre;
-    const bPlay = document.createElement("button");
-    bPlay.textContent = "Escuchar";
-    bPlay.onclick = () => sintetizarYReproducir(d.texto, fishActivo() ? "fish" : vozSel, bPlay);
-    const bDel = document.createElement("button");
-    bDel.className = "del"; bDel.textContent = "Borrar";
-    bDel.onclick = () => {
-      if (!confirm(`¿Borrar "${d.nombre}"?`)) return;
-      localStorage.setItem(BIBLIO_KEY, JSON.stringify(biblioLeer().filter((x) => x.id !== d.id)));
-      pintarBiblio();
-    };
-    div.appendChild(bPlay); div.appendChild(bDel);
-    cont.appendChild(div);
-  }
+  let p = null;
+  frases.forEach((f, i) => {
+    if (f.nuevoParrafo || !p) { p = document.createElement("p"); cont.appendChild(p); }
+    const span = document.createElement("span");
+    span.className = "frase"; span.dataset.i = i;
+    span.textContent = (p.childElementCount ? " " : "") + f.texto;
+    p.appendChild(span);
+  });
+  $("tituloLectura").textContent = nombre;
+  $("vistaHome").classList.add("oculto");
+  $("vistaLectura").classList.remove("oculto");
+  $("playerPill").classList.add("oculto");
+  $("menuVoz").classList.add("oculto");
+  window.scrollTo({ top: 0 });
+
+  urlsActivas = [];
+  const id = nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) + "-" + texto.length.toString(36);
+  const trozos = trocearPorFrases(frases, 2000);
+  docActual = { id, nombre, texto, frases, trozos, partes: null, blobTotal: null, trozoActual: -1, sonando: false };
+
+  // botón empezar / retomar
+  const pos = JSON.parse(localStorage.getItem("tanz-pos-" + id) || "null");
+  const btn = document.createElement("button");
+  btn.className = "btn-empezar";
+  btn.id = "btnEmpezar";
+  btn.textContent = pos ? `▶ Continuar donde quedaste (parte ${pos.trozo + 1} de ${trozos.length})` : `▶ Escuchar (${Math.max(1, Math.round(texto.length / 14.5 / 60))} min)`;
+  btn.onclick = () => empezarAudio(pos ? pos.trozo : 0);
+  cont.before(btn);
 }
-async function sintetizarTrozos(texto, voz, enProgreso) {
-  const trozos = trocearParaTTS(texto, 2000);
+function volverHome() {
+  detener();
+  $("vistaLectura").classList.add("oculto");
+  $("playerPill").classList.add("oculto");
+  $("menuVoz").classList.add("oculto");
+  $("vistaHome").classList.remove("oculto");
+  pintarBiblio();
+  window.scrollTo({ top: 0 });
+}
+$("btnVolver").addEventListener("click", volverHome);
+
+/* ---------------- síntesis en paralelo ---------------- */
+async function sintetizarTodo(enProgreso) {
+  const { trozos } = docActual;
   const partes = new Array(trozos.length);
   let hechos = 0;
   const t0 = Date.now();
   const cola = [...trozos.keys()];
+  const voz = fishActivo() ? "fish" : vozSel;
   async function obrera() {
     while (cola.length) {
       const i = cola.shift();
       let err = null;
       for (const reintento of [1, 2, 3]) {
-        try { partes[i] = await synthPuente(trozos[i], voz, "+0%"); hechos++; err = null; break; }
+        try { partes[i] = await synthPuente(trozos[i].texto, voz, "+0%", reintento); hechos++; err = null; break; }
         catch (e) { err = e; if (reintento < 3) await new Promise((r) => setTimeout(r, 1500 * reintento)); }
       }
       if (err) throw err;
       const restante = hechos ? ((Date.now() - t0) / hechos) * (trozos.length - hechos) / 1000 : 0;
       enProgreso(hechos, trozos.length, restante);
     }
-    return new Blob(partes, { type: "audio/mpeg" });
   }
-  return (await Promise.all([obrera(), obrera(), obrera()]))[0];
-}
-async function sintetizarYReproducir(texto, voz, boton) {
-  if (boton) boton.textContent = "Cargando…";
-  $("barraWrap").classList.remove("oculto");
-  try {
-    const blob = await sintetizarTrozos(texto, voz, (hechos, total, restante) => {
-      aviso((voz === "fish" ? "Tu voz: parte " : "Voz neuronal: parte ") + hechos + " de " + total + "… (~" + Math.max(1, Math.round(restante / 60)) + " min restantes)");
-      $("barra").style.width = (100 * hechos / total) + "%";
-    });
-    aviso("Listo. Reproduciendo…");
-    playerSet(URL.createObjectURL(blob), docNombre);
-  } catch (e) {
-    aviso("El servidor de voces no respondió — reproduzco con la voz rápida.");
-    reproducirTexto(texto);
-  } finally {
-    $("barraWrap").classList.add("oculto");
-    if (boton) boton.textContent = "Escuchar";
-  }
+  await Promise.all([obrera(), obrera(), obrera()]);
+  docActual.partes = partes;
+  docActual.blobTotal = new Blob(partes, { type: "audio/mpeg" });
+  prepararDescarga();
 }
 
-/* ---------------- botón voz neuronal ---------------- */
-$("btnNeuronal").addEventListener("click", async () => {
-  if (!docTexto || $("btnNeuronal").dataset.ocupado === "1") return;
-  $("btnNeuronal").dataset.ocupado = "1";
-  $("btnNeuronal").disabled = true;
-  $("btnGenerar").disabled = true;
-  if ($("aNube").checked) { guardarLocal(docTexto, docNombre); pintarBiblio(); }
-  await sintetizarYReproducir(docTexto, fishActivo() ? "fish" : vozSel);
-  delete $("btnNeuronal").dataset.ocupado;
-  $("btnNeuronal").disabled = false;
-  $("btnGenerar").disabled = false;
-});
-
-/* ---------------- botón voz rápida (Google) ---------------- */
-$("btnGenerar").addEventListener("click", async () => {
-  if (!docTexto || $("btnGenerar").dataset.ocupado === "1") return;
-  $("btnGenerar").dataset.ocupado = "1";
-  $("btnGenerar").disabled = true;
-  $("btnNeuronal").disabled = true;
-  aviso("Generando audio rápido…");
-  guardarLocal(docTexto, docNombre);
-  pintarBiblio();
+async function empezarAudio(trozoInicial = 0) {
+  const btn = $("btnEmpezar");
+  if (btn) { btn.disabled = true; btn.textContent = "Preparando la voz…"; }
+  $("genBox").classList.remove("oculto");
   try {
-    reproducirTexto(docTexto);
-    aviso("");
+    if (!docActual.partes) {
+      await sintetizarTodo((hechos, total, restante) => {
+        $("genTexto").textContent = `Generando audio — parte ${hechos} de ${total}`;
+        $("genPct").textContent = `~${Math.max(1, Math.round(restante / 60))} min`;
+        $("genFill").style.width = (100 * hechos / total) + "%";
+      });
+    }
+    if (btn) btn.remove();
+    $("genBox").classList.add("oculto");
+    $("playerPill").classList.remove("oculto");
+    guardarLocal(docActual.nombre, docActual.texto, docActual.frases, docActual.trozos);
+    pintarBiblio();
+    $("vozActual").textContent = fishActivo() ? "Tu voz" : (VOCES.find((v) => v.id === vozSel) || VOCES[0]).nombre;
+    reproducirTrozo(trozoInicial);
   } catch (e) {
-    aviso("Error: " + e.message);
-  } finally {
-    delete $("btnGenerar").dataset.ocupado;
-    $("btnGenerar").disabled = false;
-    $("btnNeuronal").disabled = false;
+    $("genBox").classList.add("oculto");
+    if (btn) { btn.disabled = false; btn.textContent = "▶ Intentar de nuevo"; }
+    toast("El servidor de voces no respondió. Intenta de nuevo en un minuto.");
   }
+}
+
+/* ---------------- reproducción con resaltado ---------------- */
+const player = $("player");
+let urlsActivas = [];
+function detener() {
+  player.pause();
+  player.removeAttribute("src");
+  urlsActivas.forEach((u) => URL.revokeObjectURL(u));
+  urlsActivas = [];
+  docActual && (docActual.trozoActual = -1);
+  limpiarResaltado();
+  $("playerPill").classList.add("oculto");
+}
+function limpiarResaltado() {
+  document.querySelectorAll(".frase.actual,.frase.pasada").forEach((x) => x.classList.remove("actual", "pasada"));
+}
+function resaltarTrozo(i, progreso = 0) {
+  const { trozos } = docActual;
+  const t = trozos[i];
+  document.querySelectorAll(".frase").forEach((sp) => {
+    const idx = +sp.dataset.i;
+    sp.classList.toggle("actual", idx >= t.desde && idx <= t.hasta);
+    sp.classList.toggle("pasada", idx < t.desde);
+  });
+  // frase dentro del trozo según avance
+  const nFrases = t.hasta - t.desde + 1;
+  const actual = t.desde + Math.min(nFrases - 1, Math.floor(progreso * nFrases));
+  const span = document.querySelector(`.frase[data-i="${actual}"]`);
+  if (span) {
+    document.querySelectorAll(".frase.actual").forEach((x) => x.classList.toggle("actual", x === span));
+    span.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+  const pct = 100 * ((i + progreso) / trozos.length);
+  $("fill").style.width = pct + "%";
+}
+function reproducirTrozo(i) {
+  if (i >= docActual.trozos.length) { finDocumento(); return; }
+  docActual.trozoActual = i;
+  localStorage.setItem("tanz-pos-" + docActual.id, JSON.stringify({ trozo: i }));
+  if (urlsActivas[i]) player.src = urlsActivas[i];
+  else {
+    urlsActivas[i] = URL.createObjectURL(docActual.partes[i]);
+    player.src = urlsActivas[i];
+  }
+  player.playbackRate = velocidad;
+  player.ontimeupdate = () => {
+    const p = player.duration ? player.currentTime / player.duration : 0;
+    resaltarTrozo(i, p);
+    $("tPos").textContent = `Parte ${i + 1} de ${docActual.trozos.length}`;
+  };
+  player.onended = () => reproducirTrozo(i + 1);
+  player.play().catch(() => {});
+  refrescarPlay();
+}
+function finDocumento() {
+  docActual.trozoActual = -1;
+  limpiarResaltado();
+  localStorage.removeItem("tanz-pos-" + docActual.id);
+  $("btnPlay").textContent = "▶";
+}
+function refrescarPlay() { $("btnPlay").textContent = player.paused ? "▶" : "⏸"; }
+
+$("btnPlay").addEventListener("click", () => {
+  if (!player.src) return;
+  player.paused ? player.play() : player.pause();
+  refrescarPlay();
+});
+$("btnAtras").addEventListener("click", () => {
+  if (player.currentTime > 3) player.currentTime = Math.max(0, player.currentTime - 15);
+  else if (docActual && docActual.trozoActual > 0) reproducirTrozo(docActual.trozoActual - 1);
+});
+$("btnAdelante").addEventListener("click", () => {
+  if (player.currentTime < player.duration - 3) player.currentTime = Math.min(player.duration || 0, player.currentTime + 15);
+  else if (docActual && docActual.trozoActual < docActual.trozos.length - 1) reproducirTrozo(docActual.trozoActual + 1);
+});
+const VELOCIDADES = [0.75, 1, 1.25, 1.5, 1.75, 2];
+$("btnVel").addEventListener("click", () => {
+  const i = VELOCIDADES.indexOf(velocidad);
+  velocidad = VELOCIDADES[(i + 1) % VELOCIDADES.length];
+  localStorage.setItem("tanz-vel", velocidad);
+  player.playbackRate = velocidad;
+  $("btnVel").textContent = velocidad + "×";
+});
+$("btnVel").textContent = velocidad + "×";
+$("progresoGlobal").addEventListener("click", (e) => {
+  if (!docActual) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const i = Math.floor(docActual.trozos.length * (e.clientX - r.left) / r.width);
+  reproducirTrozo(Math.min(i, docActual.trozos.length - 1));
+});
+$("btnCerrar").addEventListener("click", detener);
+
+/* menú de voz en el pill */
+$("vozActual").addEventListener("click", () => {
+  const menu = $("menuVoz");
+  if (!menu.classList.contains("oculto")) { menu.classList.add("oculto"); return; }
+  menu.innerHTML = "";
+  for (const v of VOCES) {
+    const b = document.createElement("button");
+    b.className = "chip" + (v.id === vozSel ? " sel" : "");
+    b.innerHTML = `<span class="nombre"></span><span class="pais">${v.pais}</span>`;
+    b.querySelector(".nombre").textContent = v.nombre;
+    b.onclick = () => {
+      vozSel = v.id; localStorage.setItem("tanz-voz", v.id);
+      $("vozActual").textContent = v.nombre;
+      menu.classList.add("oculto");
+      toast("Voz cambiada a " + v.nombre + ". Se aplica en la próxima generación.");
+    };
+    menu.appendChild(b);
+  }
+  menu.classList.remove("oculto");
 });
 
-/* ---------------- inicio ---------------- */
+/* ---------------- biblioteca local ---------------- */
+const BIBLIO_KEY = "tanz-biblio";
+function biblioLeer() { try { return JSON.parse(localStorage.getItem(BIBLIO_KEY) || "[]"); } catch (e) { return []; } }
+function guardarLocal(nombre, texto, frases, trozos) {
+  const lista = biblioLeer();
+  const id = docActual.id;
+  lista.unshift({ id, nombre, fecha: new Date().toISOString(), chars: texto.length });
+  while (lista.length > 12) lista.pop();
+  localStorage.setItem(BIBLIO_KEY, JSON.stringify(lista));
+  localStorage.setItem("tanz-doc-" + id, JSON.stringify({ nombre, texto }));
+}
+function pintarBiblio() {
+  const cont = $("biblioteca");
+  const docs = biblioLeer();
+  if (!docs.length) {
+    cont.innerHTML = '<div style="color:var(--gris); font-size:.85rem; padding:8px 2px">Todavía no tienes audiolibros. Sube tu primer documento arriba.</div>';
+    return;
+  }
+  cont.innerHTML = "";
+  for (const d of docs) {
+    const card = document.createElement("div");
+    card.className = "doc-card";
+    const kb = Math.round((d.chars || 0) / 100) / 10;
+    const pos = JSON.parse(localStorage.getItem("tanz-pos-" + d.id) || "null");
+    card.innerHTML = `<b></b><small>${new Date(d.fecha).toLocaleDateString("es-CL")} · ${kb}k caracteres</small>
+      ${pos ? '<div class="progreso-mini"><div style="width:' + Math.min(100, (pos.trozo + 1) * 8) + '%"></div></div>' : ""}`;
+    card.querySelector("b").textContent = d.nombre;
+    card.onclick = () => abrirDeBiblio(d);
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕"; del.title = "Borrar";
+    del.onclick = (e) => {
+      e.stopPropagation();
+      if (!confirm(`¿Borrar "${d.nombre}"?`)) return;
+      localStorage.setItem(BIBLIO_KEY, JSON.stringify(biblioLeer().filter((x) => x.id !== d.id)));
+      localStorage.removeItem("tanz-doc-" + d.id);
+      localStorage.removeItem("tanz-pos-" + d.id);
+      pintarBiblio();
+    };
+    card.appendChild(del);
+    cont.appendChild(card);
+  }
+}
+function abrirDeBiblio(d) {
+  const guardado = JSON.parse(localStorage.getItem("tanz-doc-" + d.id) || "null");
+  if (!guardado) { toast("Este documento ya no está en este dispositivo."); return; }
+  const frases = dividirFrases(guardado.texto);
+  const cont = $("textoLectura");
+  cont.innerHTML = "";
+  let p = null;
+  frases.forEach((f, i) => {
+    if (f.nuevoParrafo || !p) { p = document.createElement("p"); cont.appendChild(p); }
+    const span = document.createElement("span");
+    span.className = "frase"; span.dataset.i = i;
+    span.textContent = (p.childElementCount ? " " : "") + f.texto;
+    p.appendChild(span);
+  });
+  $("tituloLectura").textContent = d.nombre;
+  $("vistaHome").classList.add("oculto");
+  $("vistaLectura").classList.remove("oculto");
+  $("playerPill").classList.remove("oculto");
+  urlsActivas = [];
+  window.scrollTo({ top: 0 });
+  const pos = JSON.parse(localStorage.getItem("tanz-pos-" + d.id) || "null");
+  const trozos = trocearPorFrases(frases, 2000);
+  const btn = document.createElement("button");
+  btn.className = "btn-empezar"; btn.id = "btnEmpezar";
+  btn.textContent = pos ? `▶ Continuar (parte ${pos.trozo + 1} de ${trozos.length})` : "▶ Escuchar";
+  btn.onclick = () => empezarAudio(pos ? pos.trozo : 0);
+  cont.before(btn);
+}
+
+/* ---------------- voces (chips) ---------------- */
 const contVoces = $("voces");
-const VOCES = [
-  { id: "es-CL-CatalinaNeural", nombre: "Catalina", pais: "Chile" },
-  { id: "es-CL-LorenzoNeural", nombre: "Lorenzo", pais: "Chile" },
-  { id: "es-MX-DaliaNeural", nombre: "Dalia", pais: "México" },
-  { id: "es-MX-JorgeNeural", nombre: "Jorge", pais: "México" },
-  { id: "es-AR-ElenaNeural", nombre: "Elena", pais: "Argentina" },
-  { id: "es-UY-ValentinaNeural", nombre: "Valentina", pais: "Uruguay" },
-  { id: "es-ES-ElviraNeural", nombre: "Elvira", pais: "España" },
-  { id: "es-ES-AlvaroNeural", nombre: "Álvaro", pais: "España" },
-];
-if (!VOCES.some((v) => v.id === vozSel)) vozSel = VOCES[0].id;
 for (const v of VOCES) {
   const b = document.createElement("button");
   b.className = "chip" + (v.id === vozSel ? " sel" : "");
@@ -590,16 +564,16 @@ for (const v of VOCES) {
   contVoces.appendChild(b);
 }
 async function previsualizar(v) {
-  const frase = `Hola, soy ${v.nombre}. Voy a leer tus apuntes contigo.`;
   try {
-    const blob = await synthPuente(frase, v.id, "+0%");
-    playerSet(URL.createObjectURL(blob), docNombre);
-  } catch (e) {
-    aviso("No pude conectar con el servidor de voces.");
-  }
+    const blob = await synthPuente(`Hola, soy ${v.nombre}. Voy a leer tus apuntes contigo.`, v.id, "+0%");
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.playbackRate = velocidad;
+    player.play().catch(() => {});
+  } catch (e) { toast("No pude conectar con el servidor de voces."); }
 }
-pinIniciar();
-/* ---------- panel voz clonada ---------- */
+
+/* ---------------- fish audio panel ---------------- */
 $("fishKey").value = localStorage.getItem("tanz-fish-key") || "";
 $("fishRef").value = localStorage.getItem("tanz-fish-ref") || "";
 $("fishToggle").addEventListener("click", async () => {
@@ -610,9 +584,7 @@ $("fishToggle").addEventListener("click", async () => {
     try {
       const r = await fetch(PUENTE + "/fish/ping", { signal: AbortSignal.timeout(8000) });
       $("fishEstado").textContent = r.ok ? "" : "Tu servidor de voces todavía no tiene el módulo Fish: falta una actualización.";
-    } catch (e) {
-      $("fishEstado").textContent = "No pude contactar el servidor de voces.";
-    }
+    } catch (e) { $("fishEstado").textContent = "No pude contactar el servidor de voces."; }
     $("fishEstado").dataset.revisado = "1";
   }
 });
@@ -623,3 +595,14 @@ for (const [id, llave] of [["fishKey", "tanz-fish-key"], ["fishRef", "tanz-fish-
     $("fishEstado").textContent = fishActivo() ? "Listo: la próxima generación usará tu voz clonada." : "";
   });
 }
+
+/* ---------------- descarga ---------------- */
+function prepararDescarga() {
+  if (!docActual || !docActual.blobTotal) return;
+  const dl = $("btnDescargar");
+  dl.href = URL.createObjectURL(docActual.blobTotal);
+  dl.download = (docActual.nombre || "tanz") + ".mp3";
+  dl.onclick = null;
+}
+
+pinIniciar();
