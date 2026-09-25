@@ -64,14 +64,17 @@ function pinAbrir(fase, sub) {
 }
 function pinIniciar() {
   const guardado = localStorage.getItem(PIN_KEY);
-  if (guardado) pinAbrir("entrar", "Tu código de acceso");
-  else pinAbrir("crear", "Elige 4 dígitos: serán tu código de acceso");
+  pinFase = guardado ? "entrar" : "crear";
+  pinBuffer = "";
+  const titulo = document.getElementById("pinTitulo");
+  if (titulo) titulo.textContent = guardado ? "Tu código de acceso" : "Elige 4 dígitos: serán tu código de acceso";
+  document.querySelectorAll("#pin .dots span").forEach((d) => d.classList.remove("lleno"));
   document.getElementById("pin").classList.remove("oculto");
 }
 function iniciarApp() {
   if (appIniciada) return;
   appIniciada = true;
-  pintarBiblio().catch(() => {});
+  try { pintarBiblio(); } catch (e) {}
 }
 
 /* ---------------- configuración ---------------- */
@@ -81,6 +84,7 @@ const CFG = {
   token: ["github_pat_11CNPKXYA0", "x5BAEzDPKHkH_HcvOeWs4RQP8qe19J2IrcNoUSGdFK2NIKir8a1kJWW3ETJDWNRGWjyjb1TO"].join(""),
 };
 let vozSel = localStorage.getItem("tanz-voz") || "es-CL-CatalinaNeural";
+const PUENTE = "https://tanz-y18v.onrender.com";
 let docTexto = "", docNombre = "";
 
 const $ = (id) => document.getElementById(id);
@@ -393,64 +397,73 @@ function reproducirSecuencia(urls, rate) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* ---------------- biblioteca ---------------- */
-async function guardarDoc(texto, nombre) {
-  const slug = nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "doc";
-  const id = slug + "-" + Date.now().toString(36);
-  await ghEscribirJSON(`docs/${id}/texto.json`, { id, nombre, fecha: new Date().toISOString(), chars: texto.length, texto }, `agregar ${id}`);
-  const idxFile = await ghLeerJSON(ID_IDX);
-  const idx = (idxFile && idxFile.data) || [];
-  idx.unshift({ id, nombre, fecha: new Date().toISOString(), chars: texto.length });
-  await ghEscribirJSON(ID_IDX, idx, "índice", idxFile ? idxFile.sha : undefined);
-  return id;
+/* ---------------- biblioteca (en este dispositivo) ---------------- */
+const BIBLIO_KEY = "tanz-biblio";
+function biblioLeer() {
+  try { return JSON.parse(localStorage.getItem(BIBLIO_KEY) || "[]"); } catch (e) { return []; }
 }
-async function pintarBiblio() {
+function guardarLocal(texto, nombre) {
+  const lista = biblioLeer();
+  const id = "d" + Date.now().toString(36);
+  lista.unshift({ id, nombre, fecha: new Date().toISOString(), chars: texto.length, texto });
+  while (lista.length > 12) lista.pop(); // la biblioteca guarda hasta 12 documentos
+  localStorage.setItem(BIBLIO_KEY, JSON.stringify(lista));
+}
+function pintarBiblio() {
   const cont = $("biblioteca");
-  try {
-    const idxFile = await ghLeerJSON(ID_IDX);
-    const docs = (idxFile && idxFile.data) || [];
-    if (!docs.length) { cont.innerHTML = '<div class="vacio">Tu biblioteca está vacía: genera un audiolibro.</div>'; return; }
-    cont.innerHTML = "";
-    for (const d of docs) {
-      const div = document.createElement("div");
-      div.className = "doc-item";
-      const kb = Math.round((d.chars || 0) / 100) / 10;
-      div.innerHTML = `<div class="info"><b></b><small>${new Date(d.fecha).toLocaleDateString("es-CL")} · ${kb}k caracteres</small></div>`;
-      div.querySelector("b").textContent = d.nombre;
-      const bPlay = document.createElement("button");
-      bPlay.textContent = "Escuchar";
-      bPlay.onclick = () => reproducirNube(d, bPlay);
-      const bDel = document.createElement("button");
-      bDel.className = "del"; bDel.textContent = "Borrar";
-      bDel.onclick = async () => {
-        if (!confirm(`¿Borrar "${d.nombre}"?`)) return;
-        await borrarDoc(d.id);
-        pintarBiblio();
-      };
-      div.appendChild(bPlay); div.appendChild(bDel);
-      cont.appendChild(div);
-    }
-  } catch (e) {
-    cont.innerHTML = `<div class="vacio">No pude cargar la biblioteca: ${e.message}</div>`;
+  const docs = biblioLeer();
+  if (!docs.length) { cont.innerHTML = '<div class="vacio">Tu biblioteca está vacía: genera un audiolibro.</div>'; return; }
+  cont.innerHTML = "";
+  for (const d of docs) {
+    const div = document.createElement("div");
+    div.className = "doc-item";
+    const kb = Math.round((d.chars || 0) / 100) / 10;
+    div.innerHTML = `<div class="info"><b></b><small>${new Date(d.fecha).toLocaleDateString("es-CL")} · ${kb}k caracteres</small></div>`;
+    div.querySelector("b").textContent = d.nombre;
+    const bPlay = document.createElement("button");
+    bPlay.textContent = "Escuchar";
+    bPlay.onclick = () => sintetizarYReproducir(d.texto, bPlay);
+    const bDel = document.createElement("button");
+    bDel.className = "del"; bDel.textContent = "Borrar";
+    bDel.onclick = () => {
+      if (!confirm(`¿Borrar "${d.nombre}"?`)) return;
+      localStorage.setItem(BIBLIO_KEY, JSON.stringify(biblioLeer().filter((x) => x.id !== d.id)));
+      pintarBiblio();
+    };
+    div.appendChild(bPlay); div.appendChild(bDel);
+    cont.appendChild(div);
   }
 }
-async function reproducirNube(d, boton) {
-  boton.textContent = "Cargando…";
+async function sintetizarYReproducir(texto, boton) {
+  if (boton) { boton.textContent = "Cargando…"; }
+  const MAPA = { "es": "es-CL-CatalinaNeural", "es-MX": "es-MX-DaliaNeural", "es-ES": "es-ES-ElviraNeural" };
+  const voz = MAPA[vozSel] || "es-CL-CatalinaNeural";
+  $("barraWrap").classList.remove("oculto");
   try {
-    const f = await ghLeer(`docs/${d.id}/texto.json`);
-    if (!f) throw new Error("no encontrado");
-    const texto = JSON.parse(await f.blob.text()).texto;
+    const trozos = trocearParaTTS(texto, 500);
+    const partes = [];
+    for (let i = 0; i < trozos.length; i++) {
+      aviso(`Voz neuronal: parte ${i + 1} de ${trozos.length}…`);
+      let ok = false, err = null;
+      for (const reintento of [1, 2]) {
+        try { partes.push(await synthPuente(trozos[i], voz, "+0%")); ok = true; break; }
+        catch (e) {
+          err = e;
+          aviso(`Parte ${i + 1} de ${trozos.length} — reintento ${reintento}…`);
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+      if (!ok) throw err || new Error("falló una parte");
+      $("barra").style.width = (100 * (i + 1) / trozos.length) + "%";
+    }
+    aviso("Voz neuronal lista. Reproduciendo…");
+    reproducirSecuencia([URL.createObjectURL(new Blob(partes, { type: "audio/mpeg" }))], parseFloat($("playback").value));
+  } catch (e) {
+    aviso("El servidor de voces no respondió — reproduzco con la voz rápida.");
     reproducirTexto(texto);
-  } catch (e) { alert("No pude cargar: " + e.message); }
-  boton.textContent = "Escuchar";
-}
-async function borrarDoc(id) {
-  const f = await ghLeer(`docs/${id}/texto.json`);
-  if (f) await ghBorrar(`docs/${id}/texto.json`, f.sha);
-  const idxFile = await ghLeerJSON(ID_IDX);
-  if (idxFile) {
-    const idx = idxFile.data.filter((x) => x.id !== id);
-    await ghEscribirJSON(ID_IDX, idx, "índice", idxFile.sha);
+  } finally {
+    $("barraWrap").classList.add("oculto");
+    if (boton) boton.textContent = "Escuchar";
   }
 }
 
@@ -463,6 +476,8 @@ $("btnNeuronal").addEventListener("click", async () => {
   $("barraWrap").classList.remove("oculto");
   const MAPA = { "es": "es-CL-CatalinaNeural", "es-MX": "es-MX-DaliaNeural", "es-ES": "es-ES-ElviraNeural" };
   const voz = MAPA[vozSel] || "es-CL-CatalinaNeural";
+  guardarLocal(docTexto, docNombre);
+  pintarBiblio();
   try {
     const trozos = trocearParaTTS(docTexto, 500);
     const partes = [];
@@ -485,14 +500,35 @@ $("btnNeuronal").addEventListener("click", async () => {
     aviso("Voz neuronal lista. Reproduciendo…");
     const blob = new Blob(partes, { type: "audio/mpeg" });
     reproducirSecuencia([URL.createObjectURL(blob)], parseFloat($("playback").value));
-    pintarBiblio();
   } catch (e) {
-    aviso("Error: " + e.message);
+    aviso("El servidor de voces no respondió — reproduzco con la voz rápida.");
+    reproducirTexto(docTexto);
   } finally {
     delete $("btnNeuronal").dataset.ocupado;
     $("btnNeuronal").disabled = false;
     $("btnGenerar").disabled = false;
     $("barraWrap").classList.add("oculto");
+  }
+});
+
+/* ---------------- botón voz rápida (Google) ---------------- */
+$("btnGenerar").addEventListener("click", async () => {
+  if (!docTexto || $("btnGenerar").dataset.ocupado === "1") return;
+  $("btnGenerar").dataset.ocupado = "1";
+  $("btnGenerar").disabled = true;
+  $("btnNeuronal").disabled = true;
+  aviso("Generando audio rápido…");
+  guardarLocal(docTexto, docNombre);
+  pintarBiblio();
+  try {
+    reproducirTexto(docTexto);
+    aviso("");
+  } catch (e) {
+    aviso("Error: " + e.message);
+  } finally {
+    delete $("btnGenerar").dataset.ocupado;
+    $("btnGenerar").disabled = false;
+    $("btnNeuronal").disabled = false;
   }
 });
 
@@ -514,4 +550,4 @@ for (const v of VOCES) {
   };
   contVoces.appendChild(b);
 }
-pintarBiblio().catch(() => {});
+pinIniciar();
