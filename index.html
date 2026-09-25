@@ -29,8 +29,9 @@ body{margin:0; color:var(--tinta); background:var(--papel);
   position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:6px;
   background:linear-gradient(180deg,#ffffff, #f2f8fb)}
 .marca{font-family:var(--serif); font-size:2.1rem; font-weight:700; letter-spacing:.5px;
-  color:var(--tinta); display:flex; align-items:baseline; gap:9px}
+  color:var(--tinta); display:flex; align-items:center; gap:9px}
 .marca .punto{width:11px; height:11px; border-radius:50%; background:var(--celeste); flex:none}
+.marca .cisne{width:36px; height:auto; flex:none; transform:translateY(1px)}
 .sub{font-family:var(--mono); font-size:.68rem; color:var(--gris); letter-spacing:.6px; margin:2px 0 26px}
 .paso{display:flex; gap:13px; padding:13px 10px; border-radius:12px; align-items:flex-start; transition:.15s}
 .paso:hover{background:#edf5f9}
@@ -38,7 +39,8 @@ body{margin:0; color:var(--tinta); background:var(--papel);
   border-radius:6px; padding:2px 6px; margin-top:2px}
 .paso .t{font-weight:600; font-size:.92rem}
 .paso .d{font-size:.76rem; color:var(--gris); margin-top:1px}
-.sidebar .pie{margin-top:auto; font-family:var(--mono); font-size:.64rem; color:#a8bac8; line-height:1.6}
+.sidebar .pie{margin-top:auto; color:#8fb3cc}
+  .sidebar .pie .cisne{width:42px; opacity:.55}
 .contenido{flex:1; padding:26px 34px 50px; min-width:0}
 .hero{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px}
 .hero h1{font-family:var(--serif); font-weight:600; font-size:2.3rem; margin:0; letter-spacing:-.5px}
@@ -157,6 +159,7 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
   display:flex; align-items:center; justify-content:center; padding:20px}
 #pin .box{background:#fff; border-radius:24px; padding:36px 28px 30px; max-width:340px; width:100%;
   text-align:center; box-shadow:0 24px 60px -18px rgba(2,60,100,.4)}
+#pin .logo{width:60px; display:block; margin:0 auto 10px}
 #pin .marca{font-family:var(--serif); font-weight:700; font-size:1.7rem; color:var(--tinta); margin-bottom:2px}
 #pin .marca span{color:var(--celeste)}
 #pin .sub{font-size:.8rem; color:var(--gris); margin-bottom:20px}
@@ -168,24 +171,52 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
   background:#fff; color:var(--tinta); font-family:Sora,Inter; font-size:1.3rem; font-weight:600; cursor:pointer; transition:.1s}
 #pin .teclado button:active{background:var(--celeste-suave); transform:scale(.96)}
 #pin .err{color:#b54a4a; font-size:.8rem; min-height:1.2em; margin-top:10px}
+
+/* ---------- reproductor ---------- */
+.player-card{background:linear-gradient(135deg,#0c4a6e,#075985); border-radius:18px; padding:18px; color:#f0f9ff; margin-top:10px}
+.pp-row{display:flex; align-items:center; gap:12px}
+.btn-play{width:54px; height:54px; border-radius:50%; background:#38bdf8; border:none; color:#06202e; font-size:1.25rem; cursor:pointer; flex:none; transition:.15s}
+.btn-play:hover{transform:scale(1.05)}
+.btn-salto{background:rgba(255,255,255,.14); border:none; color:#e0f2fe; border-radius:10px; padding:9px 11px; cursor:pointer; font-size:.75rem; font-family:var(--mono); flex:none}
+.btn-salto:hover{background:rgba(255,255,255,.24)}
+.track{flex:1; height:7px; background:rgba(255,255,255,.22); border-radius:99px; position:relative; cursor:pointer}
+.track .fill{position:absolute; top:0; bottom:0; left:0; width:0%; background:#7dd3fc; border-radius:99px}
+.tiempo{font-family:var(--mono); font-size:.68rem; color:#bae6fd; display:flex; justify-content:space-between; margin-top:9px}
+.vels{display:flex; gap:6px; margin-top:12px}
+.vels button{flex:1; background:rgba(255,255,255,.1); color:#e0f2fe; border:none; border-radius:9px; padding:7px 0; font-size:.72rem; font-family:var(--mono); cursor:pointer; transition:.12s}
+.vels button.sel{background:#38bdf8; color:#06202e; font-weight:700}
+
+/* ---------- chips de voz con nombre ---------- */
+.chips{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:9px}
+.chip{position:relative; border:1.5px solid var(--linea); background:#fff; border-radius:13px; padding:9px 12px 10px; text-align:left; cursor:pointer; transition:.13s; color:var(--tinta)}
+.chip:hover{border-color:var(--celeste)}
+.chip.sel{border-color:var(--celeste); background:var(--celeste-suave)}
+.chip .nombre{font-family:var(--serif); font-weight:700; font-size:1.05rem; display:block}
+.chip .pais{display:block; font-family:var(--mono); font-size:.58rem; color:var(--gris); letter-spacing:.5px; text-transform:uppercase; margin-top:2px}
+.chip .prev{position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; border:none; background:var(--celeste-suave); color:var(--celeste); cursor:pointer; font-size:.65rem; display:flex; align-items:center; justify-content:center}
+.chip .prev:hover{background:var(--celeste); color:#fff}
+
+/* ---------- voz clonada (fish audio) ---------- */
+.fish-toggle{margin-top:14px; background:none; border:none; color:var(--celeste); font-family:var(--mono); font-size:.68rem; letter-spacing:.4px; cursor:pointer; padding:0; text-decoration:underline}
+.fish-panel{margin-top:10px; background:var(--celeste-suave); border-radius:12px; padding:12px}
+.fish-nota{font-size:.72rem; color:var(--gris); margin:0 0 10px; line-height:1.5}
+.fish-panel input{width:100%; box-sizing:border-box; border:1.5px solid var(--linea); border-radius:9px; padding:8px 10px; font-size:.8rem; margin-bottom:8px; font-family:var(--mono)}
+.fish-estado{font-size:.7rem; color:var(--gris); min-height:1em}
 </style>
 </head>
 <body>
 
-<div id="config" class="oculto">
-  <div class="box">
-    <h1>Tanz</h1>
-    <p>Conecta tu GitHub para la biblioteca sincronizada</p>
-    <input id="cfgUser" placeholder="Usuario de GitHub" autocomplete="off">
-    <input id="cfgRepo" placeholder="Repositorio (tanz-biblioteca)" value="tanz-biblioteca" autocomplete="off">
-    <input id="cfgToken" type="password" placeholder="Token (PAT)" autocomplete="off">
-    <button id="btnCfgGuardar">Conectar</button>
-    <div class="err" id="cfgErr"></div>
-  </div>
-</div>
-
+<svg style="display:none" aria-hidden="true"><defs>
+<g id="cisne">
+  <path d="M26 36 C25 28 32 22 40 25 C45 27 47 33 44 38 C49 37 54 40 55 45 C56 49 54 52 51 54 C60 57 70 58 79 61 C88 63 94 70 93 79 C92 89 83 95 71 95 L50 95 C37 95 28 87 27 77 C26 68 30 61 37 58 C33 54 29 48 28 42 C27.5 39 26.5 37.5 26 36 Z" fill="currentColor"/>
+  <path d="M52 90 C60 82 74 80 86 84" fill="none" stroke="#7dd3fc" stroke-width="3" opacity=".55"/>
+  <circle cx="38" cy="31" r="1.8" fill="#0c4a6e"/>
+  <path d="M17 41 L27 36 L26 45 Z" fill="#38bdf8"/>
+</g>
+</defs></svg>
 <div id="pin" class="oculto">
   <div class="box">
+    <svg class="logo" viewBox="0 0 128 128" style="color:#f0f9ff"><rect width="128" height="128" rx="30" fill="#0c4a6e"/><use href="#cisne"/></svg>
     <div class="marca">Tanz<span>.</span></div>
     <div id="pinTitulo" class="sub">Elige 4 dígitos: serán tu código de acceso</div>
     <div class="dots"><span></span><span></span><span></span><span></span></div>
@@ -200,19 +231,19 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
 </div>
 <div class="escritorio">
   <aside class="sidebar">
-    <div class="marca">Tanz <span class="punto"></span></div>
+    <div class="marca"><svg class="cisne" viewBox="20 14 92 100" style="color:var(--tinta)"><use href="#cisne"/></svg><span>Tanz</span><span class="punto"></span></div>
     <div class="sub">AUDIO · APUNTES · ESTUDIO</div>
     <div class="paso"><span class="num">01</span><div><div class="t">Documento</div><div class="d">PDF, Markdown o texto</div></div></div>
     <div class="paso"><span class="num">02</span><div><div class="t">Voz</div><div class="d">8 voces, 7 países</div></div></div>
     <div class="paso"><span class="num">03</span><div><div class="t">Generar</div><div class="d">audio al instante</div></div></div>
-    <div class="paso"><span class="num">04</span><div><div class="t">Biblioteca</div><div class="d">sincronizada por GitHub</div></div></div>
-    <div class="pie">TANZ v2 · VOCES NEURONALES EDGE<br>SÍNTESIS EN TU DISPOSITIVO<br>BIBLIOTECA · GITHUB</div>
+    <div class="paso"><span class="num">04</span><div><div class="t">Biblioteca</div><div class="d">en este dispositivo</div></div></div>
+    <div class="pie"><svg class="cisne" viewBox="20 14 92 100"><use href="#cisne"/></svg></div>
   </aside>
 
   <div class="contenido">
     <div class="hero">
       <h1>Tus apuntes, <em>en audiolibro</em></h1>
-      <div class="meta">TANZ · ESTUDIO EN VOZ ALTA</div>
+      
     </div>
 
     <div class="card">
@@ -232,23 +263,18 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
     </div>
 
     <div class="card">
-      <h2>Voz y velocidad</h2>
-      <div class="rotulo">02 · ELEGIR VOZ</div>
+      <h2>Voz</h2>
+      <div class="rotulo">02 · ELIGE QUIÉN TE LEE</div>
       <div class="chips" id="voces"></div>
-      <div class="fila">
-        <label>Lectura</label>
-        <select id="rate">
-          <option value="+0%">normal</option>
-          <option value="+10%">un poco rápido</option>
-          <option value="+20%">rápido</option>
-          <option value="-10%">lento</option>
-        </select>
-        <label>Escucha</label>
-        <select id="playback">
-          <option value="1">1×</option><option value="1.25">1.25×</option>
-          <option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option>
-        </select>
-        <label class="chk"><input type="checkbox" id="aNube" checked> subir a mi biblioteca</label>
+      <button class="fish-toggle" id="fishToggle">Usar mi propia voz (clonada con Fish Audio)</button>
+      <div class="fish-panel oculto" id="fishPanel">
+        <p class="fish-nota">Crea una cuenta gratis en <b>fish.audio</b>, copia tu API key (en API Keys) y el <i>reference_id</i> de tu voz clonada (sube 30 segundos de tu voz hablando y te lo da). Pégalo aquí:</p>
+        <input id="fishKey" type="password" placeholder="API key de fish.audio" autocomplete="off">
+        <input id="fishRef" placeholder="reference_id de tu voz" autocomplete="off">
+        <div id="fishEstado" class="fish-estado"></div>
+      </div>
+      <div class="fila" style="margin-top:14px">
+        <label class="chk"><input type="checkbox" id="aNube" checked> guardar en mi biblioteca</label>
       </div>
     </div>
 
@@ -260,24 +286,35 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
       <div class="barra oculto" id="barraWrap"><div id="barra"></div></div>
       <div class="aviso" id="aviso"></div>
       <div id="resultado" class="oculto">
-        <div class="rotulo" style="margin-top:12px">04 · ESCUCHA AQUÍ MISMO</div>
-        <audio id="player" controls></audio>
+        <div class="rotulo" style="margin-top:12px">04 · TU AUDIOCLIENTE</div>
+        <div class="player-card">
+          <div class="pp-row">
+            <button class="btn-salto" id="btnAtras">−15 s</button>
+            <button class="btn-play" id="btnPlay">▶</button>
+            <button class="btn-salto" id="btnAdelante">+15 s</button>
+            <div class="track" id="track"><div class="fill" id="fill"></div></div>
+          </div>
+          <div class="tiempo"><span id="tActual">0:00</span><span id="tTotal">0:00</span></div>
+          <div class="vels" id="vels">
+            <button data-v="0.75">0.75×</button><button data-v="1" class="sel">1×</button><button data-v="1.25">1.25×</button><button data-v="1.5">1.5×</button><button data-v="2">2×</button>
+          </div>
+        </div>
+        <audio id="player" style="display:none"></audio>
         <div class="acciones">
           <a id="btnDescargar" download>Descargar MP3</a>
         </div>
-        <p class="nota">El audio también queda en tu biblioteca: se sincroniza con tus otros dispositivos.</p>
       </div>
     </div>
 
     <div class="card">
       <h2>Biblioteca</h2>
-      <div class="rotulo">04 · SINCRONIZADA POR GITHUB</div>
+      <div class="rotulo">04 · TUS AUDIOLIBROS</div>
       <div id="biblioteca"><div class="vacio">Cargando…</div></div>
     </div>
   </div>
 </div>
 
-<footer>TANZ · VOCES NEURONALES EDGE · SÍNTESIS EN TU PROPIO DISPOSITIVO · PDF / MD / TXT</footer>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="app.js"></script>
