@@ -209,6 +209,11 @@ h1.titulo em{font-style:italic; color:var(--celeste)}
         <b>Leer en voz alta</b>
         <small>Toca para subir un documento — PDF, Markdown o texto</small>
       </div>
+      <div style="text-align:center; margin:-6px 0 12px"><button class="fish-toggle" id="btnPegar" style="font-size:.72rem">…o pega texto directamente</button></div>
+      <div id="pegarBox" class="oculto" style="background:var(--card); border:1px solid var(--linea); border-radius:14px; padding:12px; margin-bottom:16px">
+        <textarea id="pegarTexto" placeholder="Pega aquí el texto que quieres escuchar…" style="width:100%; box-sizing:border-box; min-height:140px; background:var(--fondo); color:var(--tinta); border:1.5px solid var(--linea); border-radius:10px; padding:12px; font-family:var(--sans); font-size:.9rem; resize:vertical"></textarea>
+        <button class="btn-empezar" id="btnPegarListo" style="margin-top:10px">Escuchar este texto</button>
+      </div>
       <div class="zona-voz">
         <div class="rotulo">¿Quién te lee?</div>
         <div class="chips" id="voces"></div>
@@ -250,7 +255,7 @@ h1.titulo em{font-style:italic; color:var(--celeste)}
     <button class="btn-salto" id="btnAdelante">+15 s</button>
     <span class="tiempo" id="tPos">0:00 / 0:00</span>
     <button class="btn-vel" id="btnVel">1×</button>
-    <a id="btnDescargar" class="btn-salto" download style="text-decoration:none" title="descargar MP3">⤓</a><button class="voz-actual" id="vozActual" title="voz actual"></button>
+    <a id="btnDescargar" class="btn-salto" download style="text-decoration:none" title="descargar MP3">⤓</a><button class="btn-salto" id="btnSleep" title="temporizador para dormir">🌙</button><button class="voz-actual" id="vozActual" title="voz actual"></button>
     <button class="cerrar" id="btnCerrar">✕</button>
   </div>
 </div>
