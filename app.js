@@ -244,7 +244,7 @@ function dividirFrases(texto) {
     const limpio = parrafo.trim();
     if (!limpio) continue;
     const partes = limpio.split(/(?<=[.!?;:])\s+/).map((x) => x.trim()).filter(Boolean);
-    partes.forEach((f, i) => frases.push({ texto: f, nuevoParrafo: i === 0 }));
+    partes.forEach((f, i) => frases.push({ literal: f, nuevoParrafo: i === 0 }));
   }
   return frases;
 }
@@ -272,7 +272,7 @@ function abrirLectura(nombre, texto) {
     if (f.nuevoParrafo || !p) { p = document.createElement("p"); cont.appendChild(p); }
     const span = document.createElement("span");
     span.className = "frase"; span.dataset.i = i;
-    span.textContent = (p.childElementCount ? " " : "") + f.texto;
+    span.textContent = (p.childElementCount ? " " : "") + f.literal;
     p.appendChild(span);
   });
   $("tituloLectura").textContent = nombre;
@@ -284,7 +284,8 @@ function abrirLectura(nombre, texto) {
 
   urlsActivas = [];
   const id = nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) + "-" + texto.length.toString(36);
-  const trozos = trocearPorFrases(frases, 2000);
+  const frasesAudio = frases.map((f) => ({ texto: limpiar(f.literal), nuevoParrafo: f.nuevoParrafo }));
+  const trozos = trocearPorFrases(frasesAudio, 2000);
   docActual = { id, nombre, texto, frases, trozos, partes: null, blobTotal: null, trozoActual: -1, sonando: false };
 
   // botón empezar / retomar
@@ -434,7 +435,7 @@ $("btnAdelante").addEventListener("click", () => {
   if (player.currentTime < player.duration - 3) player.currentTime = Math.min(player.duration || 0, player.currentTime + 15);
   else if (docActual && docActual.trozoActual < docActual.trozos.length - 1) reproducirTrozo(docActual.trozoActual + 1);
 });
-const VELOCIDADES = [0.75, 1, 1.25, 1.5, 1.75, 2];
+const VELOCIDADES = [0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.5, 3];
 $("btnVel").addEventListener("click", () => {
   const i = VELOCIDADES.indexOf(velocidad);
   velocidad = VELOCIDADES[(i + 1) % VELOCIDADES.length];
@@ -442,7 +443,36 @@ $("btnVel").addEventListener("click", () => {
   player.playbackRate = velocidad;
   $("btnVel").textContent = velocidad + "×";
 });
-$("btnVel").textContent = velocidad + "×";
+let sleepTimer = null, sleepMin = 0;
+const SLEEP_OPCIONES = [0, 5, 15, 30];
+$("btnSleep").addEventListener("click", () => {
+  sleepMin = SLEEP_OPCIONES[(SLEEP_OPCIONES.indexOf(sleepMin) + 1) % SLEEP_OPCIONES.length];
+  if (sleepTimer) { clearTimeout(sleepTimer); sleepTimer = null; }
+  if (sleepMin) {
+    $("btnSleep").textContent = "🌙" + sleepMin;
+    toast("El audio se pausará en " + sleepMin + " minutos.");
+    sleepTimer = setTimeout(() => { player.pause(); refrescarPlay(); toast("Pausa programada ✓"); }, sleepMin * 60000);
+  } else {
+    $("btnSleep").textContent = "🌙";
+    toast("Temporizador apagado.");
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !$("playerPill").classList.contains("oculto") && player.src &&
+      !/input|textarea/i.test(document.activeElement.tagName)) {
+    e.preventDefault();
+    player.paused ? player.play() : player.pause();
+    refrescarPlay();
+  }
+});
+
+/* pegar texto */
+$("btnPegar").addEventListener("click", () => $("pegarBox").classList.toggle("oculto"));
+$("btnPegarListo").addEventListener("click", () => {
+  const t = $("pegarTexto").value.trim();
+  if (t.length < 40) { toast("Pega un texto más largo para escucharlo."); return; }
+  abrirLectura("Texto pegado", t);
+});
 $("progresoGlobal").addEventListener("click", (e) => {
   if (!docActual) return;
   const r = e.currentTarget.getBoundingClientRect();
@@ -525,7 +555,7 @@ function abrirDeBiblio(d) {
     if (f.nuevoParrafo || !p) { p = document.createElement("p"); cont.appendChild(p); }
     const span = document.createElement("span");
     span.className = "frase"; span.dataset.i = i;
-    span.textContent = (p.childElementCount ? " " : "") + f.texto;
+    span.textContent = (p.childElementCount ? " " : "") + f.literal;
     p.appendChild(span);
   });
   $("tituloLectura").textContent = d.nombre;
@@ -535,7 +565,8 @@ function abrirDeBiblio(d) {
   urlsActivas = [];
   window.scrollTo({ top: 0 });
   const pos = JSON.parse(localStorage.getItem("tanz-pos-" + d.id) || "null");
-  const trozos = trocearPorFrases(frases, 2000);
+  const frasesAudio = frases.map((f) => ({ texto: limpiar(f.literal), nuevoParrafo: f.nuevoParrafo }));
+  const trozos = trocearPorFrases(frasesAudio, 2000);
   const btn = document.createElement("button");
   btn.className = "btn-empezar"; btn.id = "btnEmpezar";
   btn.textContent = pos ? `▶ Continuar (parte ${pos.trozo + 1} de ${trozos.length})` : "▶ Escuchar";
@@ -569,6 +600,13 @@ async function previsualizar(v) {
     const url = URL.createObjectURL(blob);
     player.src = url;
     player.playbackRate = velocidad;
+    $("playerPill").classList.remove("oculto");
+    $("menuVoz").classList.add("oculto");
+    $("vozActual").textContent = "Muestra · " + v.nombre;
+    $("tPos").textContent = "Muestra de voz";
+    $("btnDescargar").style.display = "none";
+    player.onended = () => { $("btnPlay").textContent = "▶"; };
+    refrescarPlay();
     player.play().catch(() => {});
   } catch (e) { toast("No pude conectar con el servidor de voces."); }
 }
