@@ -1,0 +1,34 @@
+TANZ — publicar en 10 minutos (gratis, sin documento ni tarjeta)
+
+1. CUENTA GITHUB
+   github.com/signup — solo necesitas un email.
+
+2. REPO DE LA APP (público)
+   - github.com/new → nombre "tanz" → Public → Create repository.
+   - En la página del repo: "uploading an existing file" → arrastra
+     index.html, app.js, icon.svg y manifest.webmanifest → Commit changes.
+
+3. ACTIVAR PAGES (publica la app)
+   - En el repo: Settings → Pages → Branch: main / (root) → Save.
+   - En 1 minuto la app vive en: https://TUUSUARIO.github.io/tanz/
+
+4. REPO DE BIBLIOTECA (privado)
+   - github.com/new → nombre "tanz-biblioteca" → Private → Create.
+
+5. TOKEN DE CONEXIÓN
+   - github.com/settings/personal-access-tokens/new  (Fine-grained)
+   - Repository access: "Only select repositories" → tanz-biblioteca
+   - Permissions → Repository permissions → Contents: "Read and write"
+   - Generate token → copia el código (github_pat_... o ghp_...)
+
+6. CONECTAR LA APP
+   - Abre tu enlace del paso 3: aparece la pantalla de conexión.
+   - Usuario de GitHub + repo (tanz-biblioteca) + pega el token.
+   - "Guardar y conectar". Repite en cada dispositivo una sola vez.
+
+USO: subir PDF / .md / .txt → elegir voz → Generar → escuchar, descargar o
+ver en la biblioteca. La biblioteca vive en tu repo privado de GitHub:
+lo que subes desde el celu aparece en tu Mac y viceversa, al instante.
+
+LÍMITES GRATIS: API de GitHub 5.000 consultas/hora y ~1-5 GB en el repo
+privado. Para uso personal de estudio es de sobra.
