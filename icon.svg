@@ -6,17 +6,12 @@
     </linearGradient>
   </defs>
   <rect width="128" height="128" rx="32" fill="url(#fondo)"/>
-  <!-- cuello en S -->
-  <path d="M50 64 C 50 48, 58 44, 62 38 C 66 32, 62 26, 54 27" fill="none" stroke="#f0f9ff" stroke-width="11" stroke-linecap="round"/>
-  <!-- cabeza -->
-  <circle cx="50" cy="28" r="8.5" fill="#f0f9ff"/>
-  <!-- pico -->
-  <path d="M42 25 L 28 30 L 43 34 Z" fill="#22d3ee"/>
-  <!-- cuerpo -->
-  <path d="M34 70 C 22 72, 16 80, 18 88 L 96 88 C 102 80, 100 70, 90 66 C 78 60, 52 60, 34 70 Z" fill="#f0f9ff"/>
-  <!-- ala -->
-  <path d="M46 74 C 54 66, 68 64, 78 70 C 70 78, 54 80, 46 74 Z" fill="#dbeafe" opacity=".55"/>
-  <!-- agua -->
-  <path d="M28 96 Q 44 92, 60 96 T 92 96" stroke="#38bdf8" stroke-width="5" fill="none" stroke-linecap="round" opacity=".75"/>
-  <path d="M44 106 Q 60 102, 76 106" stroke="#7dd3fc" stroke-width="4" fill="none" stroke-linecap="round" opacity=".5"/>
+  <g style="color:#f0f9ff">
+    <ellipse cx="63" cy="89" rx="30" ry="13.5" fill="#f0f9ff"/>
+    <path d="M86 82 C92 76 98 74 103 76 C100 80 95 84 88 86 Z" fill="#f0f9ff"/>
+    <path d="M59 78 C57 66 55 54 60 42 C63 34.5 71 32 76 36" fill="none" stroke="#f0f9ff" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="75" cy="33" r="6.5" fill="#f0f9ff"/>
+    <path d="M80.5 30.5 L92 33.5 L81.5 37 Z" fill="#38bdf8"/>
+    <path d="M34 109 Q51 104 68 109 T102 109" stroke="#38bdf8" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".85"/>
+  </g>
 </svg>
