@@ -1,222 +1,181 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tanz — tus apuntes, en audiolibro</title>
-<meta name="theme-color" content="#eef5f9">
+<title>Tanz — escucha tus apuntes</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,600&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
-  --papel:#f4f8fa; --panel:#ffffff; --tinta:#13293d; --tinta2:#3d5568; --gris:#7a8fa0;
-  --celeste:#0c8dd6; --celeste-osc:#065a8c; --celeste-suave:#e3f1f8; --linea:#d9e6ee;
-  --mono:"IBM Plex Mono", ui-monospace, monospace; --serif:"Fraunces", Georgia, serif;
+  --fondo:#0a0e13; --panel:#10161d; --card:#151d27; --card2:#1a2432;
+  --linea:#243040; --tinta:#e6edf3; --gris:#8fa1b5; --celeste:#38bdf8;
+  --celeste-suave:rgba(56,189,248,.12); --serif:Fraunces,Georgia,serif;
+  --sans:Sora,system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
 }
-*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-body{margin:0; color:var(--tinta); background:var(--papel);
-  font-family:Inter,-apple-system,sans-serif; font-size:15.5px; line-height:1.55;
-  min-height:100vh}
-::selection{background:#bfe3f5}
-
-/* ---------- estructura ---------- */
-.escritorio{display:flex; min-height:100vh}
-.sidebar{width:248px; flex:none; padding:30px 26px; border-right:1px solid var(--linea);
-  position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:6px;
-  background:linear-gradient(180deg,#ffffff, #f2f8fb)}
-.marca{font-family:var(--serif); font-size:2.1rem; font-weight:700; letter-spacing:.5px;
-  color:var(--tinta); display:flex; align-items:center; gap:9px}
-.marca .punto{width:11px; height:11px; border-radius:50%; background:var(--celeste); flex:none}
-.marca .cisne{width:36px; height:auto; flex:none; transform:translateY(1px)}
-.sub{font-family:var(--mono); font-size:.68rem; color:var(--gris); letter-spacing:.6px; margin:2px 0 26px}
-.paso{display:flex; gap:13px; padding:13px 10px; border-radius:12px; align-items:flex-start; transition:.15s}
-.paso:hover{background:#edf5f9}
-.paso .num{font-family:var(--mono); font-size:.72rem; color:var(--celeste); border:1px solid var(--celeste);
-  border-radius:6px; padding:2px 6px; margin-top:2px}
-.paso .t{font-weight:600; font-size:.92rem}
-.paso .d{font-size:.76rem; color:var(--gris); margin-top:1px}
-.sidebar .pie{margin-top:auto; color:#8fb3cc}
-  .sidebar .pie .cisne{width:42px; opacity:.55}
-.contenido{flex:1; padding:26px 34px 50px; min-width:0}
-.hero{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px}
-.hero h1{font-family:var(--serif); font-weight:600; font-size:2.3rem; margin:0; letter-spacing:-.5px}
-.hero h1 em{font-style:italic; color:var(--celeste)}
-.hero .meta{font-family:var(--mono); font-size:.7rem; color:var(--gris); letter-spacing:1px}
-
-/* ---------- tarjetas ---------- */
-.card{background:var(--panel); border:1px solid var(--linea); border-radius:6px; padding:22px 24px;
-  margin-bottom:18px; position:relative}
-.card::before{content:""; position:absolute; top:-1px; left:18px; right:auto; width:46px; height:3px;
-  background:var(--celeste); border-radius:0 0 3px 3px}
-.card h2{margin:0 0 14px; font-size:.98rem; font-weight:600; color:var(--tinta); letter-spacing:.2px}
-.rotulo{font-family:var(--mono); font-size:.68rem; color:var(--gris); text-transform:uppercase;
-  letter-spacing:1.5px; margin:0 0 6px}
-
-/* ---------- dropzone ---------- */
-.drop{border:1.5px solid var(--linea); border-radius:4px; padding:30px 16px; text-align:center;
-  color:var(--gris); cursor:pointer; transition:.18s; position:relative; background:#fbfdfe}
-.drop:hover, .drop.on{border-color:var(--celeste); background:#f4fafd}
-.drop .icono{font-family:var(--mono); font-size:1.6rem; color:var(--celeste); display:block; margin-bottom:6px}
-.drop strong{color:var(--tinta); font-weight:600}
-.drop small{font-size:.78rem}
-#archivo{display:none}
-.nombre-doc{margin-top:10px; font-weight:600; color:var(--celeste-osc); word-break:break-all; font-size:.92rem}
-.preview{max-height:170px; overflow:auto; background:#f8fbfd; border:1px solid var(--linea);
-  border-radius:4px; padding:10px 12px; font-size:.79rem; white-space:pre-wrap; color:var(--tinta2); margin-top:10px;
-  font-family:var(--mono)}
-.stats{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
-.pill{font-family:var(--mono); background:var(--celeste-suave); color:var(--celeste-osc);
-  border-radius:3px; padding:3px 9px; font-size:.72rem}
-
-/* ---------- voces ---------- */
-.chips{display:flex; flex-direction:column; gap:2px}
-.chip{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%;
-  border:none; background:transparent; color:var(--tinta2); border-radius:6px;
-  padding:9px 12px; font-size:.9rem; cursor:pointer; transition:.12s; text-align:left; font-family:Inter}
-.chip:hover{background:var(--celeste-suave)}
-.chip.sel{background:var(--celeste-suave); box-shadow:inset 3px 0 0 var(--celeste); color:var(--celeste-osc); font-weight:600}
-.chip .cod{font-family:var(--mono); font-size:.64rem; color:var(--gris)}
-.chip.sel .cod{color:var(--celeste)}
-.fila{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:13px; border-top:1px solid var(--linea)}
-.fila label{font-family:var(--mono); font-size:.68rem; color:var(--gris); text-transform:uppercase; letter-spacing:1px}
-select{font-size:.88rem; padding:7px 10px; border-radius:4px; border:1px solid var(--linea);
-  background:#fff; color:var(--tinta); font-family:Inter; outline:none}
-select:focus{border-color:var(--celeste)}
-label.chk{display:flex; gap:7px; align-items:center; font-size:.84rem; color:var(--tinta2); margin-left:auto}
-label.chk input{width:15px; height:15px; accent-color:var(--celeste)}
-
-/* ---------- generar ---------- */
-button.grande{width:100%; margin-top:0; background:var(--celeste-osc); color:#fff; border:none;
-  border-radius:5px; padding:15px; font-size:.98rem; font-weight:600; cursor:pointer; transition:.15s;
-  font-family:Inter; letter-spacing:.2px}
-button.grande:hover:not(:disabled){background:var(--celeste)}
-button.grande:disabled{opacity:.4; cursor:default}
-.barra{height:3px; background:var(--linea); border-radius:99px; overflow:hidden; margin-top:14px}
-.barra > div{height:100%; width:0%; background:var(--celeste); transition:width .3s}
-.aviso{font-family:var(--mono); font-size:.74rem; color:var(--tinta2); margin-top:9px; min-height:1.3em}
-audio{width:100%; margin-top:12px}
-.acciones{display:flex; gap:9px; flex-wrap:wrap; margin-top:12px}
-.acciones a{flex:1; min-width:140px; text-align:center; text-decoration:none; border-radius:5px;
-  padding:11px; font-size:.88rem; font-weight:600; background:var(--celeste-osc); color:#fff; transition:.15s}
-.acciones a:hover{background:var(--celeste)}
-.nota{font-size:.75rem; color:var(--gris); margin:8px 0 0}
-
-/* ---------- biblioteca ---------- */
-.doc-item{display:flex; align-items:center; gap:12px; padding:13px 2px; border-bottom:1px solid #edf3f7}
-.doc-item:last-child{border-bottom:none}
-.doc-item .info{flex:1; min-width:0}
-.doc-item .info b{display:block; font-size:.9rem; font-weight:600; word-break:break-all}
-.doc-item .info small{font-family:var(--mono); color:var(--gris); font-size:.68rem}
-.doc-item button{border:1px solid var(--linea); background:#fff; color:var(--celeste-osc);
-  border-radius:4px; padding:6px 11px; font-size:.76rem; cursor:pointer; font-weight:600; transition:.12s; font-family:Inter}
-.doc-item button:hover{border-color:var(--celeste); background:var(--celeste-suave)}
-.doc-item button.del{color:#b54a4a; border-color:#eed7d7}
-.doc-item button.del:hover{background:#fdf4f4}
-.vacio{color:var(--gris); font-size:.86rem; text-align:center; padding:14px}
+*{margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--fondo); color:var(--tinta); font-family:var(--sans); font-size:15px; line-height:1.5;
+  display:flex; min-height:100vh; overflow-x:hidden}
 .oculto{display:none !important}
+.escritorio{display:flex; width:100%; align-items:stretch}
+button{font-family:var(--sans)}
 
-/* ---------- config ---------- */
-#config{position:fixed; inset:0; z-index:50; background:rgba(19,41,61,.55); backdrop-filter:blur(6px);
-  display:flex; align-items:center; justify-content:center; padding:20px}
-#config .box{background:#fff; border-radius:8px; padding:30px 28px; max-width:400px; width:100%; text-align:center;
-  box-shadow:0 30px 70px -20px rgba(19,41,61,.5)}
-#config h1{font-family:var(--serif); font-size:1.9rem; margin:0 0 4px; color:var(--tinta)}
-#config p{color:var(--gris); font-size:.83rem; margin:0 0 18px}
-#config input{width:100%; padding:12px; border-radius:5px; border:1px solid var(--linea);
-  font-size:.92rem; text-align:center; margin-bottom:10px; outline:none; font-family:var(--mono); background:#fbfdfe}
-#config input:focus{border-color:var(--celeste)}
-#config button{width:100%; padding:12px; border-radius:5px; border:none; background:var(--celeste-osc);
-  color:#fff; font-size:.95rem; font-weight:600; cursor:pointer}
-#config .err{color:#b54a4a; font-size:.8rem; min-height:1.2em; margin-top:8px}
+/* ---------- sidebar ---------- */
+aside{width:240px; flex:none; background:var(--panel); border-right:1px solid var(--linea);
+  padding:22px 16px; display:flex; flex-direction:column; gap:6px; position:sticky; top:0; height:100vh; box-sizing:border-box}
+.marca{display:flex; align-items:center; gap:10px; padding:2px 6px 18px}
+.marca .cisne{width:38px; height:38px; flex:none}
+.marca .nombre{font-family:var(--serif); font-weight:700; font-size:1.55rem; letter-spacing:.3px}
+.btn-agregar{background:var(--tinta); color:#0a0e13; border:none; border-radius:12px; padding:12px;
+  font-weight:700; font-size:.92rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:.15s}
+.btn-agregar:hover{background:#fff}
+nav{margin-top:14px; display:flex; flex-direction:column; gap:2px}
+nav button{background:none; border:none; color:var(--gris); text-align:left; padding:10px 12px; border-radius:10px;
+  font-size:.9rem; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:10px; transition:.13s}
+nav button:hover{background:var(--card); color:var(--tinta)}
+nav button.activo{background:var(--celeste-suave); color:var(--celeste)}
+.sidebar .pie{margin-top:auto; padding:10px 8px; font-size:.75rem; color:var(--gris)}
+.sidebar .pie b{display:block; color:var(--tinta); font-weight:600}
+.sidebar .pie small{font-family:var(--mono); font-size:.6rem; letter-spacing:.5px; color:#5c7089}
 
-footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var(--mono);
-  font-size:.66rem; color:#a8bac8; letter-spacing:.4px}
+/* ---------- main ---------- */
+main{flex:1; min-width:0; padding:34px 40px 140px; box-sizing:border-box}
+.rotulo{font-family:var(--mono); font-size:.62rem; color:var(--gris); letter-spacing:1.2px; text-transform:uppercase}
+h1.titulo{font-family:var(--serif); font-weight:600; font-size:2.1rem; letter-spacing:-.4px; margin:6px 0 26px}
+h1.titulo em{font-style:italic; color:var(--celeste)}
 
-/* ---------- móvil ---------- */
-@media (max-width: 919px){
-  .escritorio{display:block}
-  .sidebar{width:auto; height:auto; position:static; border-right:none; border-bottom:1px solid var(--linea);
-    padding:20px 18px 14px; background:#fff}
-  .sub{margin-bottom:8px}
-  .paso{display:none}
-  .sidebar .pie{display:none}
-  .contenido{padding:18px 16px 40px}
-  .hero h1{font-size:1.7rem}
-  footer{padding:0 16px 30px}
-}
-@media (max-width: 479px){
-  .hero h1{font-size:1.5rem}
-  .card{padding:17px 15px}
-}
+/* dropzone */
+.drop{border:1.5px dashed #35455c; border-radius:18px; background:var(--card); padding:44px 20px;
+  text-align:center; cursor:pointer; transition:.15s; margin-bottom:14px}
+.drop:hover,.drop.on{border-color:var(--celeste); background:var(--celeste-suave)}
+.drop .ico{font-size:1.6rem; margin-bottom:8px}
+.drop b{display:block; font-size:1.02rem; margin-bottom:4px}
+.drop small{color:var(--gris); font-size:.82rem}
 
-/* ---------- código de acceso ---------- */
-#pin{position:fixed; inset:0; z-index:60;
-  background:linear-gradient(165deg,#e8f3fa 0%, #cfe8f6 60%, #b5dcf2 100%);
-  display:flex; align-items:center; justify-content:center; padding:20px}
-#pin .box{background:#fff; border-radius:24px; padding:36px 28px 30px; max-width:340px; width:100%;
-  text-align:center; box-shadow:0 24px 60px -18px rgba(2,60,100,.4)}
-#pin .logo{width:60px; display:block; margin:0 auto 10px}
+/* biblioteca */
+.grid-biblio{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-top:14px}
+.doc-card{background:var(--card); border:1px solid var(--linea); border-radius:16px; padding:16px; cursor:pointer; transition:.15s; position:relative}
+.doc-card:hover{border-color:var(--celeste); transform:translateY(-2px)}
+.doc-card b{display:block; font-size:.95rem; margin-bottom:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.doc-card small{color:var(--gris); font-size:.72rem; font-family:var(--mono)}
+.doc-card .del{position:absolute; top:10px; right:10px; background:none; border:none; color:#5c7089; cursor:pointer; font-size:.85rem; padding:4px; border-radius:8px}
+.doc-card .del:hover{color:#f87171; background:rgba(248,113,113,.1)}
+.doc-card .progreso-mini{height:3px; background:var(--linea); border-radius:99px; margin-top:12px; overflow:hidden}
+.doc-card .progreso-mini div{height:100%; background:var(--celeste)}
+
+/* sección voz en home */
+.zona-voz{margin-top:30px}
+.chips{display:grid; grid-template-columns:repeat(auto-fill,minmax(138px,1fr)); gap:9px}
+.chip{position:relative; border:1.5px solid var(--linea); background:var(--card); border-radius:13px; padding:10px 12px; text-align:left; cursor:pointer; transition:.13s; color:var(--tinta)}
+.chip:hover{border-color:var(--celeste)}
+.chip.sel{border-color:var(--celeste); background:var(--celeste-suave)}
+.chip .nombre{display:block; font-family:var(--serif); font-weight:700; font-size:1.05rem}
+.chip .pais{display:block; font-family:var(--mono); font-size:.56rem; color:var(--gris); letter-spacing:.6px; text-transform:uppercase; margin-top:3px}
+.chip .prev{position:absolute; top:9px; right:9px; width:25px; height:25px; border-radius:50%; border:none; background:rgba(56,189,248,.15); color:var(--celeste); cursor:pointer; font-size:.6rem}
+
+/* fish */
+.fish-toggle{margin-top:16px; background:none; border:none; color:var(--celeste); font-family:var(--mono); font-size:.68rem; letter-spacing:.4px; cursor:pointer; padding:0; text-decoration:underline}
+.fish-panel{margin-top:12px; background:var(--card); border:1px solid var(--linea); border-radius:12px; padding:14px}
+.fish-nota{font-size:.74rem; color:var(--gris); margin:0 0 10px; line-height:1.55}
+.fish-panel input{width:100%; box-sizing:border-box; border:1.5px solid var(--linea); border-radius:9px; padding:9px 11px; font-size:.8rem; margin-bottom:8px; font-family:var(--mono); background:var(--fondo); color:var(--tinta)}
+.fish-estado{font-size:.72rem; color:var(--gris); min-height:1em}
+
+/* ---------- vista lectura ---------- */
+#vistaLectura{max-width:760px; margin:0 auto}
+.cab-lectura{display:flex; align-items:center; gap:14px; margin-bottom:18px}
+.btn-volver{background:var(--card); border:1px solid var(--linea); color:var(--tinta); width:38px; height:38px; border-radius:11px; cursor:pointer; font-size:1rem; flex:none}
+.btn-volver:hover{border-color:var(--celeste)}
+.cab-lectura .tit{font-weight:700; font-size:1.05rem; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.texto-doc{font-size:1.07rem; line-height:1.85; color:#c8d4e0}
+.texto-doc p{margin-bottom:1.2em}
+.frase{border-radius:6px; padding:1px 2px; transition:background .2s}
+.frase.actual{background:rgba(56,189,248,.26); color:#fff}
+.frase.pasada{color:#64758a}
+.cargando-gen{background:var(--card); border:1px solid var(--linea); border-radius:14px; padding:18px; margin-bottom:20px}
+.cargando-gen .fila1{display:flex; justify-content:space-between; font-size:.8rem; color:var(--gris); margin-bottom:9px}
+.barra{height:5px; background:var(--linea); border-radius:99px; overflow:hidden}
+.barra div{height:100%; width:0%; background:linear-gradient(90deg,#38bdf8,#7dd3fc); transition:width .3s}
+.aviso{color:var(--celeste); font-size:.85rem; min-height:1.3em; margin-top:10px}
+.btn-empezar{width:100%; background:var(--celeste); color:#06202e; border:none; border-radius:14px; padding:16px; font-size:1.02rem; font-weight:700; cursor:pointer; margin-top:18px; transition:.15s}
+.btn-empezar:hover{filter:brightness(1.1)}
+.btn-empezar:disabled{opacity:.45; cursor:default}
+
+/* ---------- player flotante ---------- */
+#playerPill{position:fixed; left:50%; transform:translateX(-50%); bottom:22px; z-index:50;
+  width:min(680px, calc(100vw - 32px)); background:rgba(13,19,26,.92); backdrop-filter:blur(14px);
+  border:1px solid var(--linea); border-radius:20px; box-shadow:0 18px 50px -12px rgba(0,0,0,.7);
+  padding:12px 16px 10px; box-sizing:border-box}
+#playerPill .progreso-global{height:4px; background:var(--linea); border-radius:99px; overflow:hidden; margin-bottom:10px; cursor:pointer}
+#playerPill .progreso-global div{height:100%; width:0%; background:var(--celeste)}
+.pill-row{display:flex; align-items:center; gap:10px}
+.pill-row .btn-salto{background:rgba(255,255,255,.08); border:none; color:#c8d4e0; border-radius:10px; padding:9px 11px; cursor:pointer; font-size:.72rem; font-family:var(--mono); flex:none}
+.pill-row .btn-salto:hover{background:rgba(255,255,255,.16)}
+.btn-play{width:50px; height:50px; border-radius:50%; background:var(--celeste); border:none; color:#06202e; font-size:1.15rem; cursor:pointer; flex:none; transition:.15s}
+.btn-play:hover{transform:scale(1.06)}
+.pill-row .tiempo{font-family:var(--mono); font-size:.68rem; color:#8fa1b5; margin:0 4px; white-space:nowrap}
+.btn-vel{background:rgba(56,189,248,.15); color:var(--celeste); border:none; border-radius:10px; padding:9px 12px; font-family:var(--mono); font-size:.78rem; font-weight:700; cursor:pointer; flex:none}
+.btn-vel:hover{background:rgba(56,189,248,.28)}
+.pill-row .voz-actual{font-family:var(--serif); font-weight:700; font-size:.92rem; color:var(--tinta); cursor:pointer; flex:1; text-align:left; background:none; border:none; padding:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pill-row .cerrar{background:none; border:none; color:#5c7089; font-size:1rem; cursor:pointer; flex:none; padding:6px}
+.pill-row .cerrar:hover{color:var(--tinta)}
+#menuVoz{position:fixed; bottom:96px; left:50%; transform:translateX(-50%); width:min(420px, calc(100vw - 32px));
+  background:var(--card); border:1px solid var(--linea); border-radius:16px; padding:12px; z-index:60;
+  display:grid; grid-template-columns:1fr 1fr; gap:7px; box-shadow:0 20px 60px -10px rgba(0,0,0,.8)}
+
+/* ---------- pin ---------- */
+#pin{position:fixed; inset:0; z-index:100; background:var(--fondo); display:flex; align-items:center; justify-content:center; padding:20px}
+#pin .box{background:var(--panel); border:1px solid var(--linea); border-radius:26px; padding:38px 30px 30px; max-width:340px; width:100%; text-align:center; box-sizing:border-box}
+#pin .logo{width:62px; display:block; margin:0 auto 12px}
 #pin .marca{font-family:var(--serif); font-weight:700; font-size:1.7rem; color:var(--tinta); margin-bottom:2px}
 #pin .marca span{color:var(--celeste)}
 #pin .sub{font-size:.8rem; color:var(--gris); margin-bottom:20px}
 #pin .dots{display:flex; gap:14px; justify-content:center; margin-bottom:20px}
-#pin .dots span{width:15px; height:15px; border-radius:50%; border:2px solid var(--celeste); transition:.12s}
+#pin .dots span{width:14px; height:14px; border-radius:50%; border:2px solid var(--celeste); transition:.12s}
 #pin .dots span.lleno{background:var(--celeste)}
 #pin .teclado{display:grid; grid-template-columns:repeat(3,68px); gap:12px; justify-content:center}
-#pin .teclado button{width:68px; height:62px; border-radius:14px; border:1.5px solid var(--linea);
-  background:#fff; color:var(--tinta); font-family:Sora,Inter; font-size:1.3rem; font-weight:600; cursor:pointer; transition:.1s}
+#pin .teclado button{width:68px; height:60px; border-radius:14px; border:1.5px solid var(--linea); background:var(--card); color:var(--tinta); font-family:var(--sans); font-size:1.25rem; font-weight:600; cursor:pointer; transition:.1s}
 #pin .teclado button:active{background:var(--celeste-suave); transform:scale(.96)}
-#pin .err{color:#b54a4a; font-size:.8rem; min-height:1.2em; margin-top:10px}
+#pin .err{color:#f87171; font-size:.8rem; min-height:1.2em; margin-top:10px}
 
-/* ---------- reproductor ---------- */
-.player-card{background:linear-gradient(135deg,#0c4a6e,#075985); border-radius:18px; padding:18px; color:#f0f9ff; margin-top:10px}
-.pp-row{display:flex; align-items:center; gap:12px}
-.btn-play{width:54px; height:54px; border-radius:50%; background:#38bdf8; border:none; color:#06202e; font-size:1.25rem; cursor:pointer; flex:none; transition:.15s}
-.btn-play:hover{transform:scale(1.05)}
-.btn-salto{background:rgba(255,255,255,.14); border:none; color:#e0f2fe; border-radius:10px; padding:9px 11px; cursor:pointer; font-size:.75rem; font-family:var(--mono); flex:none}
-.btn-salto:hover{background:rgba(255,255,255,.24)}
-.track{flex:1; height:7px; background:rgba(255,255,255,.22); border-radius:99px; position:relative; cursor:pointer}
-.track .fill{position:absolute; top:0; bottom:0; left:0; width:0%; background:#7dd3fc; border-radius:99px}
-.tiempo{font-family:var(--mono); font-size:.68rem; color:#bae6fd; display:flex; justify-content:space-between; margin-top:9px}
-.vels{display:flex; gap:6px; margin-top:12px}
-.vels button{flex:1; background:rgba(255,255,255,.1); color:#e0f2fe; border:none; border-radius:9px; padding:7px 0; font-size:.72rem; font-family:var(--mono); cursor:pointer; transition:.12s}
-.vels button.sel{background:#38bdf8; color:#06202e; font-weight:700}
+/* ---------- toasts ---------- */
+.aviso-flotante{position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:120; background:var(--card2);
+  border:1px solid var(--linea); color:var(--tinta); border-radius:12px; padding:10px 18px; font-size:.85rem;
+  box-shadow:0 10px 30px rgba(0,0,0,.5)}
 
-/* ---------- chips de voz con nombre ---------- */
-.chips{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:9px}
-.chip{position:relative; border:1.5px solid var(--linea); background:#fff; border-radius:13px; padding:9px 12px 10px; text-align:left; cursor:pointer; transition:.13s; color:var(--tinta)}
-.chip:hover{border-color:var(--celeste)}
-.chip.sel{border-color:var(--celeste); background:var(--celeste-suave)}
-.chip .nombre{font-family:var(--serif); font-weight:700; font-size:1.05rem; display:block}
-.chip .pais{display:block; font-family:var(--mono); font-size:.58rem; color:var(--gris); letter-spacing:.5px; text-transform:uppercase; margin-top:2px}
-.chip .prev{position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; border:none; background:var(--celeste-suave); color:var(--celeste); cursor:pointer; font-size:.65rem; display:flex; align-items:center; justify-content:center}
-.chip .prev:hover{background:var(--celeste); color:#fff}
-
-/* ---------- voz clonada (fish audio) ---------- */
-.fish-toggle{margin-top:14px; background:none; border:none; color:var(--celeste); font-family:var(--mono); font-size:.68rem; letter-spacing:.4px; cursor:pointer; padding:0; text-decoration:underline}
-.fish-panel{margin-top:10px; background:var(--celeste-suave); border-radius:12px; padding:12px}
-.fish-nota{font-size:.72rem; color:var(--gris); margin:0 0 10px; line-height:1.5}
-.fish-panel input{width:100%; box-sizing:border-box; border:1.5px solid var(--linea); border-radius:9px; padding:8px 10px; font-size:.8rem; margin-bottom:8px; font-family:var(--mono)}
-.fish-estado{font-size:.7rem; color:var(--gris); min-height:1em}
+@media (max-width:760px){
+  body{flex-direction:column}
+  aside{width:100%; height:auto; position:static; flex-direction:row; align-items:center; padding:12px 14px; gap:10px; overflow-x:auto}
+  .marca{padding:0}
+  .marca .nombre{font-size:1.2rem}
+  nav{margin:0 0 0 auto; flex-direction:row}
+  .sidebar .pie{display:none}
+  main{padding:20px 16px 150px}
+  h1.titulo{font-size:1.6rem}
+}
 </style>
 </head>
 <body>
 
+<!-- cisne: Noto "swan" (Apache 2.0, github.com/googlefonts/noto-emoji) -->
 <svg style="display:none" aria-hidden="true"><defs>
-<g id="cisne">
-  <path d="M26 36 C25 28 32 22 40 25 C45 27 47 33 44 38 C49 37 54 40 55 45 C56 49 54 52 51 54 C60 57 70 58 79 61 C88 63 94 70 93 79 C92 89 83 95 71 95 L50 95 C37 95 28 87 27 77 C26 68 30 61 37 58 C33 54 29 48 28 42 C27.5 39 26.5 37.5 26 36 Z" fill="currentColor"/>
-  <path d="M52 90 C60 82 74 80 86 84" fill="none" stroke="#7dd3fc" stroke-width="3" opacity=".55"/>
-  <circle cx="38" cy="31" r="1.8" fill="#0c4a6e"/>
-  <path d="M17 41 L27 36 L26 45 Z" fill="#38bdf8"/>
+<g id="cisne" viewBox="0 0 128 128">
+<path fill="#dcedf5" d="M36.54 12.89c9.1 2.82 11.26 12.01 10.7 18.96s-5.3 13.33-8.45 18.21c-3.1 4.81-8.67 12.74-10.42 15.86c-3.33 5.96-2.63 8.82-2.63 8.82s8.63-4.97 26.37-12.01C65 57.61 85.16 57.38 96.7 59.35s18.68 4.69 19.43 5.63s-3.75 4.88-1.6 5.73c2.16.84 6.95-4.27 8.17-3.66c2.12 1.06-.19 20.37-7.6 32.1s-22.57 18.4-50.77 18.58c-28.07.19-46.15.35-56.22-17.27c-7.13-12.48-.66-28.25 5.16-38.01C19.4 52.16 36.36 35.4 30.63 32.6c-3.85-1.88-9.1 2.53-9.1 2.53l-7.6-7.79s-.72-3.49 1.13-6.95c2.19-4.12 10.07-11.03 21.48-7.5"/>
+<path fill="#fea6a4" d="M13.03 28.94s-.84 6.34-4.93 9.01c-3.69 2.42-3.81 3.61-3.1 4.93c.99 1.83 5.63 1.55 8.59-.28s7.46-6.76 7.46-6.76l-3.1-7.04z"/>
+<path fill="#464b4e" d="M20.4 29.41c.99 1.6 2.77 3.8 1.64 6.15c-.74 1.53-3.57-.94-6.62-3.94c-1.1-1.08-4.69-3.99-2.63-5.49c2.25-1.64 4.97.66 4.97.66s.66-2.63 2.06-3.66c1.41-1.03 3.33-1.03 4.22-.09c1.33 1.4.66 3.47-.56 4.5c-1 .85-3.08 1.87-3.08 1.87"/>
+<path fill="#68a4af" d="M60.78 92.35c-9.79 0-21.31-3.05-24.12-5.21c-.53-.4-.62-1.16-.22-1.68s1.16-.62 1.68-.22c2.58 1.98 17.77 5.92 27.82 4.36c3.47-.54 5.81-1.67 6.97-3.34c1.46-2.11-1.73-4.44-1.87-4.53c-.45-.32-.62-.9-.42-1.41s.72-.83 1.26-.75c.07.01 6.98.76 8.29-2.88c.78-2.15-.95-3.03-1.31-3.18c-.54-.23-.83-.82-.7-1.39c.14-.57.66-.96 1.24-.92c.08 0 8.07.43 8.49-3.17c.24-2.07-1.34-2.5-1.52-2.54a1.2 1.2 0 1 1 .54-2.34c1.33.31 3.76 1.79 3.36 5.16c-.46 3.89-4.9 4.96-8 5.23c.54 1.01.74 2.33.15 3.96c-1.25 3.45-5.06 4.34-7.81 4.51c1.08 1.57 1.65 3.61.26 5.62c-1.55 2.23-4.43 3.69-8.58 4.34c-1.71.26-3.57.38-5.51.38"/>
+<path fill="#68a4af" d="M65.67 104.67c-.26 0-.53 0-.8-.01c-18.97-.28-36.61-14.68-37.35-15.29c-.51-.42-.58-1.18-.16-1.69s1.18-.58 1.69-.16c.18.14 17.74 14.47 35.86 14.74c13.8.24 21.32-5.23 22.31-8.19c.5-1.5-.2-2.35-.23-2.39c-.32-.38-.38-.92-.15-1.35s.7-.69 1.19-.64c.08.01 8.15.88 10.23-3.54c1.69-3.59-.76-5.16-.86-5.23a1.2 1.2 0 0 1 .92-2.18c.06.01 6.26 1.45 8.43-2.42c.55-.97.67-1.81.39-2.56c-.5-1.31-2.22-2.17-2.84-2.39s-.95-.9-.74-1.53c.22-.62.89-.96 1.52-.74c.13.05 3.29 1.16 4.29 3.79c.55 1.43.37 2.98-.54 4.59c-1.87 3.34-5.45 3.96-8.07 3.93c.62 1.44.78 3.39-.33 5.76c-2.05 4.38-7.67 5-10.7 5c.13.75.1 1.66-.23 2.66c-1.39 4.13-9.68 9.84-23.83 9.84"/>
 </g>
 </defs></svg>
+
+<!-- código de 4 dígitos -->
 <div id="pin" class="oculto">
   <div class="box">
-    <svg class="logo" viewBox="0 0 128 128" style="color:#f0f9ff"><rect width="128" height="128" rx="30" fill="#0c4a6e"/><use href="#cisne"/></svg>
+    <svg class="logo" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#0c4a6e"/><use href="#cisne"/></svg>
     <div class="marca">Tanz<span>.</span></div>
     <div id="pinTitulo" class="sub">Elige 4 dígitos: serán tu código de acceso</div>
     <div class="dots"><span></span><span></span><span></span><span></span></div>
@@ -229,94 +188,75 @@ footer{max-width:1120px; margin:6px auto 0; padding:0 34px 40px; font-family:var
     <div class="err"></div>
   </div>
 </div>
-<div class="escritorio">
+
+<div class="escritorio oculto" id="escritorio">
   <aside class="sidebar">
-    <div class="marca"><svg class="cisne" viewBox="20 14 92 100" style="color:var(--tinta)"><use href="#cisne"/></svg><span>Tanz</span><span class="punto"></span></div>
-    <div class="sub">AUDIO · APUNTES · ESTUDIO</div>
-    <div class="paso"><span class="num">01</span><div><div class="t">Documento</div><div class="d">PDF, Markdown o texto</div></div></div>
-    <div class="paso"><span class="num">02</span><div><div class="t">Voz</div><div class="d">8 voces, 7 países</div></div></div>
-    <div class="paso"><span class="num">03</span><div><div class="t">Generar</div><div class="d">audio al instante</div></div></div>
-    <div class="paso"><span class="num">04</span><div><div class="t">Biblioteca</div><div class="d">en este dispositivo</div></div></div>
-    <div class="pie"><svg class="cisne" viewBox="20 14 92 100"><use href="#cisne"/></svg></div>
+    <div class="marca"><svg class="cisne" viewBox="0 0 128 128"><use href="#cisne"/></svg><span class="nombre">Tanz</span></div>
+    <button class="btn-agregar" id="btnAgregar">＋ Agregar documento</button>
+    <input type="file" id="archivo" accept=".pdf,.md,.txt,.markdown,text/plain,application/pdf" style="display:none">
+    <nav>
+      <button id="navBiblio" class="activo">📚 Biblioteca</button>
+    </nav>
+    <div class="pie"><b>Aranza Gallardo</b><small>CUENTA TANZ</small></div>
   </aside>
 
-  <div class="contenido">
-    <div class="hero">
-      <h1>Tus apuntes, <em>en audiolibro</em></h1>
-      
-    </div>
-
-    <div class="card">
-      <h2>Documento</h2>
-      <div class="rotulo">01 · SUBIR ARCHIVO</div>
+  <main>
+    <!-- HOME -->
+    <section id="vistaHome">
+      <h1 class="titulo">¿Qué quieres <em>escuchar hoy</em>?</h1>
       <div class="drop" id="drop">
-        <span class="icono">⇪</span>
-        Toca para elegir un archivo<br><strong>PDF, .md o .txt</strong><br><small>desde Archivos, iCloud o Descargas</small>
+        <div class="ico">🎧</div>
+        <b>Leer en voz alta</b>
+        <small>Toca para subir un documento — PDF, Markdown o texto</small>
       </div>
-      <input type="file" id="archivo" accept=".pdf,.md,.txt,.markdown,text/plain,application/pdf">
-      <div class="nombre-doc oculto" id="nombreDoc">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0c8dd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-        <span id="nombreSpan"></span>
-      </div>
-      <div class="preview oculto" id="preview"></div>
-      <div class="stats oculto" id="stats"></div>
-    </div>
-
-    <div class="card">
-      <h2>Voz</h2>
-      <div class="rotulo">02 · ELIGE QUIÉN TE LEE</div>
-      <div class="chips" id="voces"></div>
-      <button class="fish-toggle" id="fishToggle">Usar mi propia voz (clonada con Fish Audio)</button>
-      <div class="fish-panel oculto" id="fishPanel">
-        <p class="fish-nota">Crea una cuenta gratis en <b>fish.audio</b>, copia tu API key (en API Keys) y el <i>reference_id</i> de tu voz clonada (sube 30 segundos de tu voz hablando y te lo da). Pégalo aquí:</p>
-        <input id="fishKey" type="password" placeholder="API key de fish.audio" autocomplete="off">
-        <input id="fishRef" placeholder="reference_id de tu voz" autocomplete="off">
-        <div id="fishEstado" class="fish-estado"></div>
-      </div>
-      <div class="fila" style="margin-top:14px">
-        <label class="chk"><input type="checkbox" id="aNube" checked> guardar en mi biblioteca</label>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Generar audio</h2>
-      <div class="rotulo">03 · SINTETIZAR</div>
-      <button class="grande" id="btnNeuronal" disabled style="background:linear-gradient(135deg,#7dd3fc,#0ea5e9);color:#06202e">Generar con voz neuronal</button>
-      <button class="grande" id="btnGenerar" disabled style="margin-top:10px">Generar audiolibro</button>
-      <div class="barra oculto" id="barraWrap"><div id="barra"></div></div>
-      <div class="aviso" id="aviso"></div>
-      <div id="resultado" class="oculto">
-        <div class="rotulo" style="margin-top:12px">04 · TU AUDIOCLIENTE</div>
-        <div class="player-card">
-          <div class="pp-row">
-            <button class="btn-salto" id="btnAtras">−15 s</button>
-            <button class="btn-play" id="btnPlay">▶</button>
-            <button class="btn-salto" id="btnAdelante">+15 s</button>
-            <div class="track" id="track"><div class="fill" id="fill"></div></div>
-          </div>
-          <div class="tiempo"><span id="tActual">0:00</span><span id="tTotal">0:00</span></div>
-          <div class="vels" id="vels">
-            <button data-v="0.75">0.75×</button><button data-v="1" class="sel">1×</button><button data-v="1.25">1.25×</button><button data-v="1.5">1.5×</button><button data-v="2">2×</button>
-          </div>
-        </div>
-        <audio id="player" style="display:none"></audio>
-        <div class="acciones">
-          <a id="btnDescargar" download>Descargar MP3</a>
+      <div class="zona-voz">
+        <div class="rotulo">¿Quién te lee?</div>
+        <div class="chips" id="voces"></div>
+        <button class="fish-toggle" id="fishToggle">Usar mi propia voz (clonada con Fish Audio)</button>
+        <div class="fish-panel oculto" id="fishPanel">
+          <p class="fish-nota">Crea una cuenta gratis en <b>fish.audio</b>, copia tu API key (en API Keys) y el <i>reference_id</i> de tu voz clonada (sube 30 segundos de tu voz hablando y te lo da). Pégalo aquí:</p>
+          <input id="fishKey" type="password" placeholder="API key de fish.audio" autocomplete="off">
+          <input id="fishRef" placeholder="reference_id de tu voz" autocomplete="off">
+          <div id="fishEstado" class="fish-estado"></div>
         </div>
       </div>
-    </div>
+      <div class="zona-voz">
+        <div class="rotulo">Tus audiolibros</div>
+        <div class="grid-biblio" id="biblioteca"></div>
+      </div>
+    </section>
 
-    <div class="card">
-      <h2>Biblioteca</h2>
-      <div class="rotulo">04 · TUS AUDIOLIBROS</div>
-      <div id="biblioteca"><div class="vacio">Cargando…</div></div>
-    </div>
-  </div>
+    <!-- LECTURA -->
+    <section id="vistaLectura" class="oculto">
+      <div class="cab-lectura">
+        <button class="btn-volver" id="btnVolver">←</button>
+        <div class="tit" id="tituloLectura"></div>
+      </div>
+      <div class="cargando-gen oculto" id="genBox">
+        <div class="fila1"><span id="genTexto">Preparando…</span><span id="genPct"></span></div>
+        <div class="barra"><div id="genFill"></div></div>
+      </div>
+      <div class="texto-doc" id="textoLectura"></div>
+    </section>
+  </main>
 </div>
 
+<!-- player flotante -->
+<div id="playerPill" class="oculto">
+  <div class="progreso-global" id="progresoGlobal"><div id="fill"></div></div>
+  <div class="pill-row">
+    <button class="btn-salto" id="btnAtras">−15 s</button>
+    <button class="btn-play" id="btnPlay">▶</button>
+    <button class="btn-salto" id="btnAdelante">+15 s</button>
+    <span class="tiempo" id="tPos">0:00 / 0:00</span>
+    <button class="btn-vel" id="btnVel">1×</button>
+    <a id="btnDescargar" class="btn-salto" download style="text-decoration:none" title="descargar MP3">⤓</a><button class="voz-actual" id="vozActual" title="voz actual"></button>
+    <button class="cerrar" id="btnCerrar">✕</button>
+  </div>
+</div>
+<div id="menuVoz" class="oculto"></div>
+<audio id="player" style="display:none"></audio>
 
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
