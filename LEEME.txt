@@ -32,3 +32,5 @@ lo que subes desde el celu aparece en tu Mac y viceversa, al instante.
 
 LÍMITES GRATIS: API de GitHub 5.000 consultas/hora y ~1-5 GB en el repo
 privado. Para uso personal de estudio es de sobra.
+
+<!-- rebuild -->
