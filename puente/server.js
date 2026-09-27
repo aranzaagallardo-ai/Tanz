@@ -39,24 +39,38 @@ function synth(texto, voice, rate) {
       },
     });
     const trozos = [];
+    const words = [];
     const timeout = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("timeout")); }, 25000);
     ws.on("open", () => {
       const ts = new Date().toUTCString();
       ws.send(`X-Timestamp:${ts}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
-        `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},` +
+        `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},` +
         `"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
       ws.send(`X-RequestId:${crypto.randomBytes(16).toString("hex")}\r\nContent-Type:application/ssml+xml\r\n` +
         `X-Timestamp:${ts}\r\nPath:ssml\r\n\r\n${ssml}`);
     });
     ws.on("message", (data, isBin) => {
-      if (!isBin) { if (data.toString().includes("Path:turn.end")) { clearTimeout(timeout); ws.close(); } return; }
+      if (!isBin) {
+        const st = data.toString();
+        if (st.includes("Path:audio.metadata")) {
+          try {
+            const body = st.slice(st.indexOf("\r\n\r\n") + 4);
+            const meta = JSON.parse(body);
+            for (const m of meta.Metadata || []) {
+              if (m.Type === "WordBoundary" && m.Data) words.push({ o: m.Data.Offset / 1e7, w: (m.Data.text && m.Data.text.Text) || "" });
+            }
+          } catch {}
+        }
+        if (st.includes("Path:turn.end")) { clearTimeout(timeout); ws.close(); }
+        return;
+      }
       const len = (data[0] << 8) | data[1];
       const header = data.slice(2, 2 + len).toString();
       if (header.includes("Path:audio")) trozos.push(data.slice(2 + len));
     });
     ws.on("close", () => {
       clearTimeout(timeout);
-      if (trozos.length) resolve(Buffer.concat(trozos));
+      if (trozos.length) resolve({ audio: Buffer.concat(trozos), words });
       else reject(new Error("sin audio"));
     });
     ws.on("error", (e) => { clearTimeout(timeout); reject(e); });
@@ -64,13 +78,14 @@ function synth(texto, voice, rate) {
 }
 
 app.post("/tts", async (req, res) => {
-  const { text, voice, rate } = req.body || {};
+  const { text, voice, rate, words } = req.body || {};
   if (!text || text.length > 2500) return res.status(400).json({ error: "texto inválido" });
   try {
-    const buf = await synth(text, voice || "es-CL-CatalinaNeural", rate || "+0%");
+    const r = await synth(text, voice || "es-CL-CatalinaNeural", rate || "+0%");
+    if (words) return res.json({ a: r.audio.toString("base64"), w: r.words });
     res.set("content-type", "audio/mpeg");
     res.set("cache-control", "public, max-age=86400");
-    res.send(buf);
+    res.send(r.audio);
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
